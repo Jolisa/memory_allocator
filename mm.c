@@ -27,15 +27,16 @@
  ********************************************************/
 team_t team = {
 	/* Team name */
-	"",
-	/* First member's full name */
-	"",
-	/* First member's NetID */
-	"",
-	/* Second member's full name (leave blank if none) */
-	"",
-	/* Second member's NetID (leave blank if none) */
-	""
+	"Team Smarties", 
+	"Jolisa Brown",
+	
+	"jmb26",
+	
+	"Vidisha Ganesh",
+	
+	"vg19",
+	
+	
 };
 
 /* Basic constants and macros: */
@@ -67,16 +68,35 @@ team_t team = {
 /* Global variables: */
 static char *heap_listp; /* Pointer to first block */  
 
+struct freeBlock{
+		int *prev;
+		int *current;
+		int *next;		
+		int size;
+};
+
+
+typedef volatile struct freeBlock *freeBlockp;
+
+static int freeList[5];
+
+
+
+
+
 /* Function prototypes for internal helper routines: */
 static void *coalesce(void *bp);
 static void *extend_heap(size_t words);
 static void *find_fit(size_t asize);
 static void place(void *bp, size_t asize);
+static void place_in_free_list(void* bp);
 
 /* Function prototypes for heap consistency checker routines: */
 static void checkblock(void *bp);
 static void checkheap(bool verbose);
 static void printblock(void *bp); 
+static void remove_from_free_list(void* bp);
+
 
 /* 
  * Requires:
@@ -86,25 +106,44 @@ static void printblock(void *bp);
  *   Initialize the memory manager.  Returns 0 if the memory manager was
  *   successfully initialized and -1 otherwise.
  */
+// int
+// mm_init(void) 
+// {
+
+// 	/* Create the initial empty heap. */
+// 	if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1)
+// 		return (-1);
+// 	PUT(heap_listp, 0);                            /* Alignment padding */
+// 	PUT(heap_listp + (1 * WSIZE), PACK(DSIZE, 1)); /* Prologue header */ 
+// 	PUT(heap_listp + (2 * WSIZE), PACK(DSIZE, 1)); /* Prologue footer */ 
+// 	PUT(heap_listp + (3 * WSIZE), PACK(0, 1));     /* Epilogue header */
+// 	heap_listp += (2 * WSIZE);
+
+// 	/* Extend the empty heap with a free block of CHUNKSIZE bytes. */
+// 	if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
+// 		return (-1);
+// 	return (0);
+// }
+
 int
 mm_init(void) 
 {
 
 	/* Create the initial empty heap. */
-	if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1)
+	if ((free_list[0] = mem_sbrk(4 * WSIZE)) == (void *)-1)
 		return (-1);
-	PUT(heap_listp, 0);                            /* Alignment padding */
-	PUT(heap_listp + (1 * WSIZE), PACK(DSIZE, 1)); /* Prologue header */ 
-	PUT(heap_listp + (2 * WSIZE), PACK(DSIZE, 1)); /* Prologue footer */ 
-	PUT(heap_listp + (3 * WSIZE), PACK(0, 1));     /* Epilogue header */
-	heap_listp += (2 * WSIZE);
+	PUT(free_list[0], 0);                            /* Alignment padding */
+	PUT(free_list[0] + (1 * WSIZE), PACK(DSIZE, 1)); /* Prologue header */ 
+	PUT(free_list[0] + (2 * WSIZE), PACK(DSIZE, 1)); /* Prologue footer */ 
+	PUT(free_list[0] + (3 * WSIZE), PACK(0, 1));     /* Epilogue header */
+	/*  We believe this is the pointer to the free memory address??*/
+	free_list[0] += (2 * WSIZE);
 
 	/* Extend the empty heap with a free block of CHUNKSIZE bytes. */
 	if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
 		return (-1);
 	return (0);
 }
-
 /* 
  * Requires:
  *   None.
@@ -132,6 +171,7 @@ mm_malloc(size_t size)
 		asize = DSIZE * ((size + DSIZE + (DSIZE - 1)) / DSIZE);
 
 	/* Search the free list for a fit. */
+
 	if ((bp = find_fit(asize)) != NULL) {
 		place(bp, asize);
 		return (bp);
@@ -156,6 +196,7 @@ void
 mm_free(void *bp)
 {
 	size_t size;
+	int coalesced_address;
 
 	/* Ignore spurious requests. */
 	if (bp == NULL)
@@ -166,6 +207,8 @@ mm_free(void *bp)
 	PUT(HDRP(bp), PACK(size, 0));
 	PUT(FTRP(bp), PACK(size, 0));
 	coalesce(bp);
+	/*coalesced_address = coalesce(bp);
+	place_in_free_list(coalesced_address);*/
 }
 
 /*
@@ -235,25 +278,36 @@ coalesce(void *bp)
 	bool next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
 
 	if (prev_alloc && next_alloc) {                 /* Case 1 */
+		place_in_free_list(bp);
 		return (bp);
 	} else if (prev_alloc && !next_alloc) {         /* Case 2 */
 		size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
+		remove_from_free_list(NEXT_BLKP(bp));
+		place_in_free_list(bp);
 		PUT(HDRP(bp), PACK(size, 0));
 		PUT(FTRP(bp), PACK(size, 0));
+	
+
 	} else if (!prev_alloc && next_alloc) {         /* Case 3 */
 		size += GET_SIZE(HDRP(PREV_BLKP(bp)));
+		remove_from_free_list(NEXT_BLKP(bp));
 		PUT(FTRP(bp), PACK(size, 0));
 		PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
 		bp = PREV_BLKP(bp);
+		place_in_free_list(bp);
 	} else {                                        /* Case 4 */
 		size += GET_SIZE(HDRP(PREV_BLKP(bp))) + 
 		    GET_SIZE(FTRP(NEXT_BLKP(bp)));
+		remove_from_free_list(NEXT_BLKP(bp));
 		PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
 		PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
 		bp = PREV_BLKP(bp);
+		place_in_free_list(bp);
 	}
 	return (bp);
 }
+
+
 
 /* 
  * Requires:
@@ -266,6 +320,7 @@ static void *
 extend_heap(size_t words) 
 {
 	size_t size;
+	int *coalesced_address;
 	void *bp;
 
 	/* Allocate an even number of words to maintain alignment. */
@@ -278,9 +333,195 @@ extend_heap(size_t words)
 	PUT(FTRP(bp), PACK(size, 0));         /* Free block footer */
 	PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /* New epilogue header */
 
+	
+
 	/* Coalesce if the previous block was free. */
+	/*coalesced_address = coalesce(bp);
+	place_in_free_list(coalesced_address);*/
+
+
+
 	return (coalesce(bp));
 }
+
+
+
+
+
+/*
+* Requires: pointer to free memory block
+*
+* Effects: Place block in appropriate location in freeList;
+*/
+static void 
+place_in_free_list(void* bp) {
+
+	struct freeBlock new_block;
+	struct freeBlock list_head;
+	size_t block_size;
+	int list_head_pointer;
+
+
+
+	block_size = NEXT_BLKP(bp) - bp;
+	new_block.current = bp;
+	new_block.size = block_size;
+
+
+	switch(block_size)
+	{
+		case 1:
+		case 2:
+
+			list_head_pointer = freeList[0];
+			list_head  =  *list_head_pointer;
+			list_head.prev = new_block.current;
+			new_block.next = list_head_pointer;
+			freeList[0] = new_block.current;
+			break;
+
+		case 3:
+			list_head_pointer = freeList[1];
+			list_head  =  *list_head_pointer;
+			list_head.prev = new_block.current;
+			new_block.next = list_head_pointer;
+			freeList[1] = new_block.current;
+
+			break;
+
+		case  4:
+			list_head_pointer = freeList[2];
+			list_head  =  *list_head_pointer;
+			list_head.prev = new_block.current;
+			new_block.next = list_head_pointer;
+			freeList[2] = new_block.current;
+			break;
+
+		case 5:
+		case 6:
+		case 7:
+		case 8:
+			list_head_pointer = freeList[3];
+			list_head  =  *list_head_pointer;
+			list_head.prev = new_block.current;
+			new_block.next = list_head_pointer;
+			freeList[3] = new_block.current;
+			break;
+		case 9:
+		case 10:
+		case 11:
+		case 12:
+		case 13:
+		case 14:
+		case 15:
+		case 16:
+			list_head_pointer = freeList[4];
+			list_head  =  *list_head_pointer;
+			list_head.prev = new_block.current;
+			new_block.next = list_head_pointer;
+			freeList[4] = new_block.current;
+
+			break;
+		default:
+			printf("\nInvalid size.\n");
+
+			break;
+
+	}
+
+}
+
+/*
+* Requires: pointer to free memory block
+*
+* Effects: Remove recently allocated block in appropriate location in freeList;
+*/
+static void 
+remove_from_free_list(void* bp) {
+
+	freeBlockp *old_block;
+	freeBlockp *curr_block;
+	int block_size = NEXT_BLKP(bp) - bp;
+
+	switch(block_size)
+	{
+		case 1:
+		case 2:
+			curr_block = freeList[0];
+			while(curr_block != NULL) {
+				if (curr_block->current == bp){
+					curr_block->prev->next = curr_block->next;
+					curr_block->next->prev = curr_block->prev;
+					break;
+				}
+				curr_block = curr_block->next;
+			}
+			break;
+
+		case 3:
+			curr_block = freeList[1];
+			while(curr_block != NULL) {
+				if (curr_block->current == bp){
+					curr_block->prev->next = curr_block->next;
+					curr_block->next->prev = curr_block->prev;
+					break;
+				}
+				curr_block = curr_block->next;
+			}
+			break;
+
+		case  4:
+			curr_block = freeList[2];
+			while(curr_block != NULL) {
+				if (curr_block->current == bp){
+					curr_block->prev->next = curr_block->next;
+					curr_block->next->prev = curr_block->prev;
+					break;
+				}
+				curr_block = curr_block->next;
+			}
+			
+			break;
+
+		case 5:
+		case 6:
+		case 7:
+		case 8:
+			curr_block = freeList[3];
+			while(curr_block != NULL) {
+				if (curr_block->current == bp){
+					curr_block->prev->next = curr_block->next;
+					curr_block->next->prev = curr_block->prev;
+					break;
+				}
+				curr_block = curr_block->next;
+			}
+			break;
+		case 9:
+		case 10:
+		case 11:
+		case 12:
+		case 13:
+		case 14:
+		case 15:
+		case 16:
+			curr_block = freeList[4];
+			while(curr_block != NULL) {
+				if (curr_block->current == bp){
+					curr_block->prev->next = curr_block->next;
+					curr_block->next->prev = curr_block->prev;
+					break;
+				}
+				curr_block = curr_block->next;
+			}
+			break;
+		default:
+			printf("\nInvalid size for removal from list.\n");
+
+			break;
+
+	}
+}	
 
 /*
  * Requires:
@@ -295,13 +536,87 @@ find_fit(size_t asize)
 {
 	void *bp;
 
-	/* Search for the first fit. */
-	for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
-		if (!GET_ALLOC(HDRP(bp)) && asize <= GET_SIZE(HDRP(bp)))
-			return (bp);
+	switch(asize)
+	{
+		case 1:
+		case 2:
+			curr_block = freeList[0];
+			while(curr_block != NULL) {
+				if (curr_block->size >= asize){
+
+					return curr_block->current;
+					break;
+				}
+				curr_block = curr_block->next;
+			}
+			break;
+
+		case 3:
+			curr_block = freeList[1];
+			while(curr_block != NULL) {
+				if (curr_block->size >= asize){
+
+					return curr_block->current;
+					break;
+				}
+				curr_block = curr_block->next;
+			}
+			
+			break;
+
+		case  4:
+			curr_block = freeList[2];
+			while(curr_block != NULL) {
+				if (curr_block->size >= asize){
+
+					return curr_block->current;
+					break;
+				}
+				curr_block = curr_block->next;
+			}
+			
+			break;
+
+		case 5:
+		case 6:
+		case 7:
+		case 8:
+			curr_block = freeList[3];
+			while(curr_block != NULL) {
+				if (curr_block->size >= asize){
+
+					return curr_block->current;
+					break;
+				}
+				curr_block = curr_block->next;
+			}
+			
+			break;
+		case 9:
+		case 10:
+		case 11:
+		case 12:
+		case 13:
+		case 14:
+		case 15:
+		case 16:
+			curr_block = freeList[4];
+			while(curr_block != NULL) {
+				if (curr_block->size >= asize){
+
+					return curr_block->current;
+					break;
+				}
+				curr_block = curr_block->next;
+			}
+			
+			break;
+		default:
+			printf("\nInvalid size for removal from list.\n");
+
+			break;
+
 	}
-	/* No fit was found. */
-	return (NULL);
 }
 
 /* 
