@@ -181,6 +181,7 @@ mm_malloc(size_t size)
 	extendsize = MAX(asize, CHUNKSIZE);
 	if ((bp = extend_heap(extendsize / WSIZE)) == NULL)  
 		return (NULL);
+		
 	place(bp, asize);
 	return (bp);
 } 
@@ -540,7 +541,27 @@ find_fit(size_t asize)
 	{
 		case 1:
 		case 2:
+			struct freeBlock a_block; 
 			curr_block = freeList[0];
+			int new_mem_location;
+			if (curr_block == NULL & curr_block->size >= asize) {
+				/* request new page of memory and add to free list for size range*/
+				free_list[0] += (2 * WSIZE);
+
+				/* Extend the empty heap with a free block of CHUNKSIZE bytes. */
+				if ((new_mem_location = extend_heap(CHUNKSIZE/2)) == NULL){
+					return (-1);
+				}
+				free_list[0] = new_mem_location;
+				64/2...32
+
+
+				break;
+
+				/* etc...etc.. break, need to check check freeList[0] to equal that thing*/
+
+
+			}
 			while(curr_block != NULL) {
 				if (curr_block->size >= asize){
 
