@@ -78,7 +78,7 @@ struct freeBlock{
 
 typedef volatile struct freeBlock *freeBlockp;
 
-static int freeList[5];
+static int free_list[5];
 
 
 
@@ -197,7 +197,7 @@ void
 mm_free(void *bp)
 {
 	size_t size;
-	int coalesced_address;
+
 
 	/* Ignore spurious requests. */
 	if (bp == NULL)
@@ -321,7 +321,7 @@ static void *
 extend_heap(size_t words) 
 {
 	size_t size;
-	int *coalesced_address;
+
 	void *bp;
 
 	/* Allocate an even number of words to maintain alignment. */
@@ -364,7 +364,8 @@ place_in_free_list(void* bp) {
 
 
 
-	block_size = NEXT_BLKP(bp) - bp;
+	//block_size = NEXT_BLKP(bp) - bp;
+	block_size = GET_SIZE(bp);
 	new_block.current = bp;
 	new_block.size = block_size;
 
@@ -375,10 +376,17 @@ place_in_free_list(void* bp) {
 		case 2:
 
 			list_head_pointer = freeList[0];
-			list_head  =  *list_head_pointer;
-			list_head.prev = new_block.current;
-			new_block.next = list_head_pointer;
-			freeList[0] = new_block.current;
+			list_head  =  (void *)list_head_pointer;
+			if(list_head == NULL) {
+			    new_block.prev = new_block.current;
+			    new_block.next = new_block.current;
+			} else {
+			    new_block.prev = list_head.prev;
+			    list_head.prev.next = new_block.current;
+                list_head.prev = new_block.current;
+                new_block.next = list_head_pointer;
+			}
+			freeList[0] = &new_block;
 			break;
 
 		case 3:
@@ -553,7 +561,7 @@ find_fit(size_t asize)
 					return (-1);
 				}
 				free_list[0] = new_mem_location;
-				64/2...32
+				//64/2...32
 
 
 				break;
@@ -657,12 +665,15 @@ place(void *bp, size_t asize)
 	if ((csize - asize) >= (2 * DSIZE)) { 
 		PUT(HDRP(bp), PACK(asize, 1));
 		PUT(FTRP(bp), PACK(asize, 1));
+		remove_from_free_list(bp);
 		bp = NEXT_BLKP(bp);
 		PUT(HDRP(bp), PACK(csize - asize, 0));
 		PUT(FTRP(bp), PACK(csize - asize, 0));
+		place_in_free_list(bp);
 	} else {
 		PUT(HDRP(bp), PACK(csize, 1));
 		PUT(FTRP(bp), PACK(csize, 1));
+		remove_from_free_list(bp);
 	}
 }
 
