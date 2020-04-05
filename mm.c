@@ -69,16 +69,16 @@ team_t team = {
 static char *heap_listp; /* Pointer to first block */  
 
 struct freeBlock{
-		int *prev;
-		int *current;
-		int *next;		
-		int size;
+		struct freeBlock *prev;
+		struct freeBlock *current;
+		struct freeBlock *next;		
+		size_t size;
 };
-
-
 typedef volatile struct freeBlock *freeBlockp;
 
-static int free_list[5];
+//static int *free_list[5];
+//static int (*free_lis);
+static struct freeBlock **freeList;
 
 
 
@@ -130,14 +130,16 @@ mm_init(void)
 {
 
 	/* Create the initial empty heap. */
-	if ((free_list[0] = mem_sbrk(4 * WSIZE)) == (void *)-1)
+	//if ((free_list[0] = mem_sbrk(4 * WSIZE)) == (void *)-1){
+	if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1){
 		return (-1);
-	PUT(free_list[0], 0);                            /* Alignment padding */
-	PUT(free_list[0] + (1 * WSIZE), PACK(DSIZE, 1)); /* Prologue header */ 
-	PUT(free_list[0] + (2 * WSIZE), PACK(DSIZE, 1)); /* Prologue footer */ 
-	PUT(free_list[0] + (3 * WSIZE), PACK(0, 1));     /* Epilogue header */
+	}
+	PUT(heap_listp, 0);                            /* Alignment padding */
+	PUT(heap_listp + (1 * WSIZE), PACK(DSIZE, 1)); /* Prologue header */ 
+	PUT(heap_listp + (2 * WSIZE), PACK(DSIZE, 1)); /* Prologue footer */ 
+	PUT(heap_listp + (3 * WSIZE), PACK(0, 1));     /* Epilogue header */
 	/*  We believe this is the pointer to the free memory address??*/
-	free_list[0] += (2 * WSIZE);
+	heap_listp += (2 * WSIZE);
 
 	/* Extend the empty heap with a free block of CHUNKSIZE bytes. */
 	if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
@@ -360,7 +362,9 @@ place_in_free_list(void* bp) {
 	struct freeBlock new_block;
 	struct freeBlock list_head;
 	size_t block_size;
-	int list_head_pointer;
+	//struct freeBlock* list_head_pointer;
+	//int* list_head_pointer;
+	struct freeBlock *list_head_pointer;
 
 
 
@@ -375,14 +379,14 @@ place_in_free_list(void* bp) {
 		case 1:
 		case 2:
 
-			list_head_pointer = freeList[0];
-			list_head  =  (void *)list_head_pointer;
-			if(list_head == NULL) {
+			list_head_pointer = freeList[0] ;
+			//list_head  =  (void *)list_head_pointer;
+			if(list_head_pointer == NULL) {
 			    new_block.prev = new_block.current;
 			    new_block.next = new_block.current;
 			} else {
 			    new_block.prev = list_head.prev;
-			    list_head.prev.next = new_block.current;
+			    list_head_pointer->prev->next = new_block.current;
                 list_head.prev = new_block.current;
                 new_block.next = list_head_pointer;
 			}
@@ -448,8 +452,8 @@ place_in_free_list(void* bp) {
 static void 
 remove_from_free_list(void* bp) {
 
-	freeBlockp *old_block;
-	freeBlockp *curr_block;
+	//struct freeBlock *old_block;
+	struct freeBlock *curr_block;
 	int block_size = NEXT_BLKP(bp) - bp;
 
 	switch(block_size)
@@ -543,24 +547,30 @@ remove_from_free_list(void* bp) {
 static void *
 find_fit(size_t asize)
 {
-	void *bp;
+	//PPRRROOBBBSS SHOULDNT BE COMMENTED OUT
+	//void *bp;
+	void *new_mem_location; 
+	//?? OR
+	//char *new_mem_location; 
+	//struct freeBlock a_block;
+	struct freeBlock *curr_block;
 
 	switch(asize)
 	{
 		case 1:
 		case 2:
-			struct freeBlock a_block; 
+			 //this seems incorrect...curr__block-> should point to bp... and freeList[0] should =curr_block
 			curr_block = freeList[0];
-			int new_mem_location;
+			
 			if (curr_block == NULL & curr_block->size >= asize) {
 				/* request new page of memory and add to free list for size range*/
-				free_list[0] += (2 * WSIZE);
+				freeList[0] += (2 * WSIZE);
 
 				/* Extend the empty heap with a free block of CHUNKSIZE bytes. */
 				if ((new_mem_location = extend_heap(CHUNKSIZE/2)) == NULL){
 					return (-1);
 				}
-				free_list[0] = new_mem_location;
+				freeList[0] = new_mem_location;
 				//64/2...32
 
 
