@@ -65,6 +65,9 @@ team_t team = {
 #define NEXT_BLKP(bp)  ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
 #define PREV_BLKP(bp)  ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
+/*Given a size, return pointer to index for given size range in freeList */
+#define GET_INDEX(size)  ((size) == (0) ? (-1) : (size) < (3) ? (0) : (size) < (4) ? (1) : (size) < (5) ? (2) : (size) < (9) ? (3) : (size) < (17) ? (4) : (5)) 
+
 /* Global variables: */
 static char *heap_listp; /* Pointer to first block */  
 
@@ -376,6 +379,7 @@ place_in_free_list(void* bp) {
 	//struct freeBlock* list_head_pointer;
 	//int* list_head_pointer;
 	struct freeBlock *list_head_pointer;
+	int index;
 
 
 
@@ -392,7 +396,29 @@ place_in_free_list(void* bp) {
 		printf("\nThis is something in freeList %p\n at index i %d\n" , freeList[i], i);
 	}
 
-	if(block_size > 16) {
+	index = GET_INDEX(block_size);
+
+	list_head_pointer =  freeList[index] ;
+		
+	printf("\n1\n");
+	//list_head  =  (freeBlock)*list_head_pointer;
+	if(list_head_pointer == NULL) {
+		
+	    new_block.prev = new_block.current;
+	    new_block.next = new_block.current;
+
+	} else {
+		printf("\n3\n");
+	    new_block.prev = list_head_pointer->prev;
+	    list_head_pointer->prev->next = &new_block;
+        list_head_pointer->prev = &new_block;
+        new_block.next = list_head_pointer;
+	}
+	printf("\n4\n");
+	freeList[index] = &new_block;
+	printf("\n5\n");
+
+	/*if(block_size > 16) {
 
 		printf("\n0\n");
 		list_head_pointer =  freeList[5] ;
@@ -510,7 +536,7 @@ place_in_free_list(void* bp) {
 
 			break;
 
-	}
+	}*/
 
 }
 
@@ -525,8 +551,20 @@ remove_from_free_list(void* bp) {
 	//struct freeBlock *old_block;
 	struct freeBlock *curr_block;
 	int block_size = GET_SIZE(HDRP(bp))/WSIZE;
+	int index = GET_INDEX(block_size);
 
-	switch(block_size)
+	curr_block = freeList[index];
+			while(curr_block != NULL) {
+				if (curr_block->current == bp){
+					curr_block->prev->next = curr_block->next;
+					curr_block->next->prev = curr_block->prev;
+					break;
+				}
+				curr_block = curr_block->next;
+			}
+
+
+	/*switch(block_size)
 	{
 		case 1:
 		case 2:
@@ -604,7 +642,7 @@ remove_from_free_list(void* bp) {
 
 			break;
 
-	}
+	}*/
 }	
 
 /*
@@ -625,8 +663,46 @@ find_fit(size_t asize)
 	//char *new_mem_location; 
 	//struct freeBlock a_block;
 	struct freeBlock *curr_block;
+	int first_index = GET_SIZE(asize);
+	
+	/* find appropriate size range beginning at smallest possible fit, repopulate size range if neccesary*/
+	for (int index = first_index ; index < 6; index ++) {		
+		curr_block = freeList[index];
+	
+		/* if no memory of appropriate size range available create memory and take first block*/
+		if (curr_block == NULL ) {
+			/* Extend the empty heap with a free block of CHUNKSIZE bytes. */
+			if ((new_mem_location = extend_heap(CHUNKSIZE/2)) == NULL){
+				return NULL;
+			}
+			
+			curr_block = freeList[index];
+			return curr_block->current;
+		}
+		/* if memory is available in size range iterate to find block large enough*/
+		while(curr_block != NULL) {
+			if (curr_block->size >= asize){
 
-	switch(asize)
+				return curr_block->current;
+			}
+			curr_block = curr_block->next;
+		}
+
+	}
+	return NULL;
+
+
+
+
+
+
+
+
+
+
+
+
+	/*switch(asize)
 	{
 		case 1:
 		case 2:
@@ -634,19 +710,14 @@ find_fit(size_t asize)
 			curr_block = freeList[0];
 			
 			if (curr_block == NULL ) {
-				/* request new page of memory and add to free list for size range*/
+				// request new page of memory and add to free list for size range
 				//freeList[0] += (2 * WSIZE);
 
-				/* Extend the empty heap with a free block of CHUNKSIZE bytes. */
+				// Extend the empty heap with a free block of CHUNKSIZE bytes. 
 				if ((new_mem_location = extend_heap(CHUNKSIZE/2)) == NULL){
 					return NULL;
 				}
-				/*curr_block->current = new_mem_location;
-				curr_block->size = GET_SIZE(new_mem_location);
-				//Should this be here or does it overlap with place_in_free_list_insertion?
-				curr_block->next = curr_block;
-				curr_block->prev = curr_block;
-				freeList[0] = curr_block;*/
+				
 				curr_block = freeList[0];
 				return curr_block->current;
 
@@ -655,7 +726,7 @@ find_fit(size_t asize)
 
 				break;
 
-				/* etc...etc.. break, need to check check freeList[0] to equal that thing*/
+				
 
 
 			}
@@ -738,7 +809,7 @@ find_fit(size_t asize)
 			break;
 
 	}
-	return NULL;
+	return NULL;*/
 }
 
 /* 
