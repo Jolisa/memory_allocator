@@ -70,8 +70,8 @@ static char *heap_listp; /* Pointer to first block */
 
 struct freeBlock{
 		struct freeBlock *prev;
-		struct freeBlock *current;
 		struct freeBlock *next;		
+		void *current;
 		size_t size;
 };
 typedef volatile struct freeBlock *freeBlockp;
@@ -131,6 +131,7 @@ mm_init(void)
 
 	/* Create the initial empty heap. */
 	//if ((free_list[0] = mem_sbrk(4 * WSIZE)) == (void *)-1){
+	//freeList = mm_malloc(sizeof *freeList);
 	if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1){
 		return (-1);
 	}
@@ -279,33 +280,41 @@ coalesce(void *bp)
 	size_t size = GET_SIZE(HDRP(bp));
 	bool prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
 	bool next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
+	//printf("\nThis is the initial size of the new block in coalesce %d \n", bp);
 
 	if (prev_alloc && next_alloc) {                 /* Case 1 */
-		place_in_free_list(bp);
+		printf("\n1: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
+		place_in_free_list((bp));
 		return (bp);
 	} else if (prev_alloc && !next_alloc) {         /* Case 2 */
 		size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
 		remove_from_free_list(NEXT_BLKP(bp));
-		place_in_free_list(bp);
+		//should we leave this as it was here or keep the change to move it down??
+		//place_in_free_list(bp);
 		PUT(HDRP(bp), PACK(size, 0));
 		PUT(FTRP(bp), PACK(size, 0));
+		printf("\n2: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
+		place_in_free_list((bp));
 	
 
 	} else if (!prev_alloc && next_alloc) {         /* Case 3 */
 		size += GET_SIZE(HDRP(PREV_BLKP(bp)));
-		remove_from_free_list(NEXT_BLKP(bp));
+		remove_from_free_list(PREV_BLKP(bp));
 		PUT(FTRP(bp), PACK(size, 0));
 		PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
 		bp = PREV_BLKP(bp);
-		place_in_free_list(bp);
+		printf("\n3: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
+		place_in_free_list((bp));
 	} else {                                        /* Case 4 */
 		size += GET_SIZE(HDRP(PREV_BLKP(bp))) + 
 		    GET_SIZE(FTRP(NEXT_BLKP(bp)));
 		remove_from_free_list(NEXT_BLKP(bp));
+		remove_from_free_list(PREV_BLKP(bp));
 		PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
 		PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
 		bp = PREV_BLKP(bp);
-		place_in_free_list(bp);
+		printf("\n4: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
+		place_in_free_list((bp));
 	}
 	return (bp);
 }
@@ -323,10 +332,12 @@ static void *
 extend_heap(size_t words) 
 {
 	size_t size;
+	printf("\nThis is the word size passed to extend_heap %d\n", (int) words);
 
 	void *bp;
 
 	/* Allocate an even number of words to maintain alignment. */
+	//do we need to make changes to our freeList here?? are multiple blocks created here?
 	size = (words % 2) ? (words + 1) * WSIZE : words * WSIZE;
 	if ((bp = mem_sbrk(size)) == (void *)-1)  
 		return (NULL);
@@ -360,7 +371,7 @@ static void
 place_in_free_list(void* bp) {
 
 	struct freeBlock new_block;
-	struct freeBlock list_head;
+	//struct freeBlock list_head;
 	size_t block_size;
 	//struct freeBlock* list_head_pointer;
 	//int* list_head_pointer;
@@ -369,10 +380,42 @@ place_in_free_list(void* bp) {
 
 
 	//block_size = NEXT_BLKP(bp) - bp;
-	block_size = GET_SIZE(bp);
+	block_size = GET_SIZE(HDRP(bp))/WSIZE;
+	printf("\nThis is the wsize in place in freeList %d\n" , (int) WSIZE);
+	printf("\nThis is the block size in place in freeList %d\n" , (int) block_size);
 	new_block.current = bp;
 	new_block.size = block_size;
+	//freeList = mm_malloc(sizeof *freeList);
 
+	
+	for (int i = 0; i < 6; i++) {
+		printf("\nThis is something in freeList %p\n at index i %d\n" , freeList[i], i);
+	}
+
+	if(block_size > 16) {
+
+		printf("\n0\n");
+		list_head_pointer =  freeList[5] ;
+		//list_head_pointer = (&freeList + 5);
+			printf("\n1\n");
+			//list_head  =  (freeBlock)*list_head_pointer;
+			if(list_head_pointer == NULL) {
+				printf("\n2\n");
+			    new_block.prev = new_block.current;
+			    new_block.next = new_block.current;
+
+			} else {
+				printf("\n3\n");
+			    new_block.prev = list_head_pointer->prev;
+			    list_head_pointer->prev->next = &new_block;
+                list_head_pointer->prev = &new_block;
+                new_block.next = list_head_pointer;
+			}
+			printf("\n4\n");
+			freeList[5] = &new_block;
+			printf("\n5\n");
+
+	}
 
 	switch(block_size)
 	{
@@ -380,45 +423,66 @@ place_in_free_list(void* bp) {
 		case 2:
 
 			list_head_pointer = freeList[0] ;
-			//list_head  =  (void *)list_head_pointer;
+			//list_head  =  (freeBlock)*list_head_pointer;
 			if(list_head_pointer == NULL) {
 			    new_block.prev = new_block.current;
 			    new_block.next = new_block.current;
 			} else {
-			    new_block.prev = list_head.prev;
-			    list_head_pointer->prev->next = new_block.current;
-                list_head.prev = new_block.current;
+			    new_block.prev = list_head_pointer->prev;
+			    list_head_pointer->prev->next = &new_block;
+                list_head_pointer->prev = &new_block;
                 new_block.next = list_head_pointer;
 			}
 			freeList[0] = &new_block;
 			break;
 
 		case 3:
-			list_head_pointer = freeList[1];
-			list_head  =  *list_head_pointer;
-			list_head.prev = new_block.current;
-			new_block.next = list_head_pointer;
-			freeList[1] = new_block.current;
+			list_head_pointer = freeList[1] ;
+			//list_head  =  (freeBlock)*list_head_pointer;
+			if(list_head_pointer == NULL) {
+			    new_block.prev = new_block.current;
+			    new_block.next = new_block.current;
+			} else {
+			    new_block.prev = list_head_pointer->prev;
+			    list_head_pointer->prev->next = &new_block;
+                list_head_pointer->prev = &new_block;
+                new_block.next = list_head_pointer;
+			}
+			freeList[1] = &new_block;
 
 			break;
 
 		case  4:
-			list_head_pointer = freeList[2];
-			list_head  =  *list_head_pointer;
-			list_head.prev = new_block.current;
-			new_block.next = list_head_pointer;
-			freeList[2] = new_block.current;
+			list_head_pointer = freeList[2] ;
+			//list_head  =  (freeBlock)*list_head_pointer;
+			if(list_head_pointer == NULL) {
+			    new_block.prev = new_block.current;
+			    new_block.next = new_block.current;
+			} else {
+			    new_block.prev = list_head_pointer->prev;
+			    list_head_pointer->prev->next = &new_block;
+                list_head_pointer->prev = &new_block;
+                new_block.next = list_head_pointer;
+			}
+			freeList[2] = &new_block;
 			break;
 
 		case 5:
 		case 6:
 		case 7:
 		case 8:
-			list_head_pointer = freeList[3];
-			list_head  =  *list_head_pointer;
-			list_head.prev = new_block.current;
-			new_block.next = list_head_pointer;
-			freeList[3] = new_block.current;
+			list_head_pointer = freeList[3] ;
+			//list_head  =  (freeBlock)*list_head_pointer;
+			if(list_head_pointer == NULL) {
+			    new_block.prev = new_block.current;
+			    new_block.next = new_block.current;
+			} else {
+			    new_block.prev = list_head_pointer->prev;
+			    list_head_pointer->prev->next = &new_block;
+                list_head_pointer->prev = &new_block;
+                new_block.next = list_head_pointer;
+			}
+			freeList[3] = &new_block;
 			break;
 		case 9:
 		case 10:
@@ -428,15 +492,21 @@ place_in_free_list(void* bp) {
 		case 14:
 		case 15:
 		case 16:
-			list_head_pointer = freeList[4];
-			list_head  =  *list_head_pointer;
-			list_head.prev = new_block.current;
-			new_block.next = list_head_pointer;
-			freeList[4] = new_block.current;
-
-			break;
+			list_head_pointer = freeList[4] ;
+			//list_head  =  (freeBlock)*list_head_pointer;
+			if(list_head_pointer == NULL) {
+			    new_block.prev = new_block.current;
+			    new_block.next = new_block.current;
+			} else {
+			    new_block.prev = list_head_pointer->prev;
+			    list_head_pointer->prev->next = &new_block;
+                list_head_pointer->prev = &new_block;
+                new_block.next = list_head_pointer;
+			}
+			freeList[4] = &new_block;
 		default:
-			printf("\nInvalid size.\n");
+			printf("\nInvalid size for placement in free list.\n");
+			printf("\nThe size is %d \n" , (int) block_size);
 
 			break;
 
@@ -454,7 +524,7 @@ remove_from_free_list(void* bp) {
 
 	//struct freeBlock *old_block;
 	struct freeBlock *curr_block;
-	int block_size = NEXT_BLKP(bp) - bp;
+	int block_size = GET_SIZE(HDRP(bp))/WSIZE;
 
 	switch(block_size)
 	{
@@ -530,6 +600,7 @@ remove_from_free_list(void* bp) {
 			break;
 		default:
 			printf("\nInvalid size for removal from list.\n");
+			printf("\nThe size is %d \n" , (int) block_size);
 
 			break;
 
@@ -559,18 +630,26 @@ find_fit(size_t asize)
 	{
 		case 1:
 		case 2:
-			 //this seems incorrect...curr__block-> should point to bp... and freeList[0] should =curr_block
+			 
 			curr_block = freeList[0];
 			
-			if (curr_block == NULL & curr_block->size >= asize) {
+			if (curr_block == NULL ) {
 				/* request new page of memory and add to free list for size range*/
-				freeList[0] += (2 * WSIZE);
+				//freeList[0] += (2 * WSIZE);
 
 				/* Extend the empty heap with a free block of CHUNKSIZE bytes. */
 				if ((new_mem_location = extend_heap(CHUNKSIZE/2)) == NULL){
-					return (-1);
+					return NULL;
 				}
-				freeList[0] = new_mem_location;
+				/*curr_block->current = new_mem_location;
+				curr_block->size = GET_SIZE(new_mem_location);
+				//Should this be here or does it overlap with place_in_free_list_insertion?
+				curr_block->next = curr_block;
+				curr_block->prev = curr_block;
+				freeList[0] = curr_block;*/
+				curr_block = freeList[0];
+				return curr_block->current;
+
 				//64/2...32
 
 
@@ -580,6 +659,8 @@ find_fit(size_t asize)
 
 
 			}
+			curr_block = freeList[0];
+
 			while(curr_block != NULL) {
 				if (curr_block->size >= asize){
 
@@ -651,11 +732,13 @@ find_fit(size_t asize)
 			
 			break;
 		default:
-			printf("\nInvalid size for removal from list.\n");
-
+			printf("\nInvalid size such that fit cannot be found.\n");
+			printf("\nThe size is %d \n" , (int) asize);
+			return NULL;
 			break;
 
 	}
+	return NULL;
 }
 
 /* 
