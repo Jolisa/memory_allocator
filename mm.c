@@ -373,7 +373,12 @@ extend_heap(size_t words)
 static void 
 place_in_free_list(void* bp) {
 
-	struct freeBlock new_block;
+    //need to move the pointer to the first free area?
+	struct freeBlock *new_block = bp;
+	//may need to check on adding HDR location - does it move, and how do we get it?
+	//are we overwriting the header?
+	bp = bp + sizeof(struct freeBlock);
+
 	//struct freeBlock list_head;
 	size_t block_size;
 	//struct freeBlock* list_head_pointer;
@@ -385,12 +390,15 @@ place_in_free_list(void* bp) {
 
 	//block_size = NEXT_BLKP(bp) - bp;
 	block_size = GET_SIZE(HDRP(bp))/WSIZE;
+    //put in header and footer? NEED TO CHECK correctness
+    PUT(HDRP(bp), PACK(block_size, 0));
+    PUT(FTRP(bp), PACK(block_size, 0));
 	printf("\nThis is the wsize in place in freeList %d\n" , (int) WSIZE);
 	printf("\nThis is the block size in place in freeList %d\n" , (int) block_size);
-	new_block.current = bp;
-	new_block.size = block_size;
+	new_block->current = bp;
+	new_block->size = block_size;
 	//freeList = mm_malloc(sizeof *freeList);
-
+    printf("newblock is getting some sort of assignment");
 	
 	for (int i = 0; i < 6; i++) {
 		printf("\nThis is something in freeList %p\n at index i %d\n" , freeList[i], i);
@@ -404,18 +412,18 @@ place_in_free_list(void* bp) {
 	//list_head  =  (freeBlock)*list_head_pointer;
 	if(list_head_pointer == NULL) {
 		
-	    new_block.prev = new_block.current;
-	    new_block.next = new_block.current;
+	    new_block->prev = new_block;
+	    new_block->next = new_block;
 
 	} else {
 		printf("\n3\n");
-	    new_block.prev = list_head_pointer->prev;
-	    list_head_pointer->prev->next = &new_block;
-        list_head_pointer->prev = &new_block;
-        new_block.next = list_head_pointer;
+	    new_block->prev = list_head_pointer->prev;
+	    list_head_pointer->prev->next = new_block;
+        list_head_pointer->prev = new_block;
+        new_block->next = list_head_pointer;
 	}
 	printf("\n4\n");
-	freeList[index] = &new_block;
+	freeList[index] = new_block;
 	printf("\n5\n");
 
 	/*if(block_size > 16) {
