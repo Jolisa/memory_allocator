@@ -82,9 +82,8 @@ typedef volatile struct freeBlock *freeBlockp;
 //static int *free_list[5];
 //static int (*free_lis);
 static struct freeBlock **freeList;
-
-
-
+//do we point? to the pointer list?
+static (void *)[] *ptr_list;
 
 
 /* Function prototypes for internal helper routines: */
@@ -148,6 +147,9 @@ mm_init(void)
 	/* Extend the empty heap with a free block of CHUNKSIZE bytes. */
 	if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
 		return (-1);
+
+	PUT(heap_listp, PACK(sizeof(ptr_list),1));
+	heap_listp += sizeof(ptr_list);
 	return (0);
 }
 /* 
@@ -374,31 +376,33 @@ static void
 place_in_free_list(void* bp) {
 
     //need to move the pointer to the first free area?
-	struct freeBlock *new_block = bp;
 	//may need to check on adding HDR location - does it move, and how do we get it?
 	//are we overwriting the header?
-	bp = bp + sizeof(struct freeBlock);
-
+	//bp = bp + sizeof(struct freeBlock);
 	//struct freeBlock list_head;
-	size_t block_size;
 	//struct freeBlock* list_head_pointer;
 	//int* list_head_pointer;
-	struct freeBlock *list_head_pointer;
+	//struct freeBlock *list_head_pointer;
+    //struct freeBlock *new_block = bp;
+    (void *)list_head_pointer;
+    size_t block_size;
 	int index;
 
 
 
 	//block_size = NEXT_BLKP(bp) - bp;
-	block_size = GET_SIZE(HDRP(bp))/WSIZE;
-    //put in header and footer? NEED TO CHECK correctness
-    PUT(HDRP(bp), PACK(block_size, 0));
-    PUT(FTRP(bp), PACK(block_size, 0));
-	printf("\nThis is the wsize in place in freeList %d\n" , (int) WSIZE);
-	printf("\nThis is the block size in place in freeList %d\n" , (int) block_size);
-	new_block->current = bp;
-	new_block->size = block_size;
-	//freeList = mm_malloc(sizeof *freeList);
-    printf("newblock is getting some sort of assignment");
+//	block_size = GET_SIZE(HDRP(bp))/WSIZE;
+//    //put in header and footer? NEED TO CHECK correctness
+//    PUT(HDRP(bp), PACK(block_size, 0));
+//    PUT(FTRP(bp), PACK(block_size, 0));
+//	printf("\nThis is the wsize in place in freeList %d\n" , (int) WSIZE);
+//	printf("\nThis is the block size in place in freeList %d\n" , (int) block_size);
+//	new_block->current = bp;
+//	new_block->size = block_size;
+//	//freeList = mm_malloc(sizeof *freeList);
+//    printf("newblock is getting some sort of assignment");
+
+    block_size = GET_SIZE(HDRP(bp))/WSIZE;
 	
 	for (int i = 0; i < 6; i++) {
 		printf("\nThis is something in freeList %p\n at index i %d\n" , freeList[i], i);
@@ -406,24 +410,42 @@ place_in_free_list(void* bp) {
 
 	index = GET_INDEX(block_size);
 
-	list_head_pointer =  freeList[index] ;
+	list_head_pointer = ptr_list[index] ;
 		
 	printf("\n1\n");
 	//list_head  =  (freeBlock)*list_head_pointer;
 	if(list_head_pointer == NULL) {
-		
-	    new_block->prev = new_block;
-	    new_block->next = new_block;
+//	    new_block->prev = new_block;
+//	    new_block->next = new_block;
+        PUT(bp, bp);
+        PUT(bp + WSIZE, bp);
+        ptr_list[index] = bp;
 
 	} else {
 		printf("\n3\n");
-	    new_block->prev = list_head_pointer->prev;
-	    list_head_pointer->prev->next = new_block;
-        list_head_pointer->prev = new_block;
-        new_block->next = list_head_pointer;
+//	    new_block->prev = list_head_pointer->prev;
+        void * other_prev_next = GET(other_prev + WSIZE);
+        //assigns the head's previous to bp previous
+	    void * head_prev = GET(list_head_pointer);
+	    PUT(*bp, head_prev);
+
+	    //assign the "current" head to bp next
+	    void * current_head = GET(*list_head_pointer);
+	    PUT(*bp + WSIZE, current_head);
+
+	    //assign head's previous to bp
+	    void * head_prev = GET(list_head_pointer);
+	    PUT(head_prev, bp);
+	    //assign
+
+
+//	    list_head_pointer->prev->next = new_block;
+//        list_head_pointer->prev = new_block;
+//        new_block->next = list_head_pointer;
 	}
 	printf("\n4\n");
-	freeList[index] = new_block;
+	ptr_list[index] = bp;
+	//freeList[index] = new_block;
 	printf("\n5\n");
 
 	/*if(block_size > 16) {
