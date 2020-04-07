@@ -81,9 +81,9 @@ typedef volatile struct freeBlock *freeBlockp;
 
 //static int *free_list[5];
 //static int (*free_lis);
-static struct freeBlock **freeList;
+//static struct freeBlock **freeList;
 //do we point? to the pointer list?
-static (void *)[] *ptr_list;
+static int **ptr_list;
 
 
 /* Function prototypes for internal helper routines: */
@@ -147,6 +147,10 @@ mm_init(void)
 	/* Extend the empty heap with a free block of CHUNKSIZE bytes. */
 	if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
 		return (-1);
+
+	//want it to be a list of pointers, currently don't know how
+	//Need to check initialization process for ptr_list
+	ptr_list = new int[6];
 
 	PUT(heap_listp, PACK(sizeof(ptr_list),1));
 	heap_listp += sizeof(ptr_list);
@@ -404,13 +408,13 @@ place_in_free_list(void* bp) {
 
     block_size = GET_SIZE(HDRP(bp))/WSIZE;
 	
-	for (int i = 0; i < 6; i++) {
-		printf("\nThis is something in freeList %p\n at index i %d\n" , freeList[i], i);
-	}
+//	for (int i = 0; i < 6; i++) {
+//		printf("\nThis is something in freeList %p\n at index i %d\n" , freeList[i], i);
+//	}
 
 	index = GET_INDEX(block_size);
 
-	list_head_pointer = ptr_list[index] ;
+	list_head_pointer = *(ptr_list[index]) ;
 		
 	printf("\n1\n");
 	//list_head  =  (freeBlock)*list_head_pointer;
@@ -419,24 +423,23 @@ place_in_free_list(void* bp) {
 //	    new_block->next = new_block;
         PUT(bp, bp);
         PUT(bp + WSIZE, bp);
-        ptr_list[index] = bp;
+        ptr_list[index] = *bp;
 
 	} else {
 		printf("\n3\n");
 //	    new_block->prev = list_head_pointer->prev;
-        void * other_prev_next = GET(other_prev + WSIZE);
+//        void * other_prev_next = GET(other_prev + WSIZE);
         //assigns the head's previous to bp previous
 	    void * head_prev = GET(list_head_pointer);
-	    PUT(*bp, head_prev);
+	    PUT(bp, head_prev);
+        //assign head's previous to bp
+        PUT(head_prev, bp);
 
 	    //assign the "current" head to bp next
-	    void * current_head = GET(*list_head_pointer);
-	    PUT(*bp + WSIZE, current_head);
+	    PUT(bp + WSIZE, list_head_pointer);
+	    //assign current's previous to bp
+	    PUT(list_head_pointer, bp);
 
-	    //assign head's previous to bp
-	    void * head_prev = GET(list_head_pointer);
-	    PUT(head_prev, bp);
-	    //assign
 
 
 //	    list_head_pointer->prev->next = new_block;
@@ -444,129 +447,9 @@ place_in_free_list(void* bp) {
 //        new_block->next = list_head_pointer;
 	}
 	printf("\n4\n");
-	ptr_list[index] = bp;
+	ptr_list[index] = *bp;
 	//freeList[index] = new_block;
 	printf("\n5\n");
-
-	/*if(block_size > 16) {
-
-		printf("\n0\n");
-		list_head_pointer =  freeList[5] ;
-		//list_head_pointer = (&freeList + 5);
-			printf("\n1\n");
-			//list_head  =  (freeBlock)*list_head_pointer;
-			if(list_head_pointer == NULL) {
-				printf("\n2\n");
-			    new_block.prev = new_block.current;
-			    new_block.next = new_block.current;
-
-			} else {
-				printf("\n3\n");
-			    new_block.prev = list_head_pointer->prev;
-			    list_head_pointer->prev->next = &new_block;
-                list_head_pointer->prev = &new_block;
-                new_block.next = list_head_pointer;
-			}
-			printf("\n4\n");
-			freeList[5] = &new_block;
-			printf("\n5\n");
-
-	}
-
-	switch(block_size)
-	{
-		case 1:
-		case 2:
-
-			list_head_pointer = freeList[0] ;
-			//list_head  =  (freeBlock)*list_head_pointer;
-			if(list_head_pointer == NULL) {
-			    new_block.prev = new_block.current;
-			    new_block.next = new_block.current;
-			} else {
-			    new_block.prev = list_head_pointer->prev;
-			    list_head_pointer->prev->next = &new_block;
-                list_head_pointer->prev = &new_block;
-                new_block.next = list_head_pointer;
-			}
-			freeList[0] = &new_block;
-			break;
-
-		case 3:
-			list_head_pointer = freeList[1] ;
-			//list_head  =  (freeBlock)*list_head_pointer;
-			if(list_head_pointer == NULL) {
-			    new_block.prev = new_block.current;
-			    new_block.next = new_block.current;
-			} else {
-			    new_block.prev = list_head_pointer->prev;
-			    list_head_pointer->prev->next = &new_block;
-                list_head_pointer->prev = &new_block;
-                new_block.next = list_head_pointer;
-			}
-			freeList[1] = &new_block;
-
-			break;
-
-		case  4:
-			list_head_pointer = freeList[2] ;
-			//list_head  =  (freeBlock)*list_head_pointer;
-			if(list_head_pointer == NULL) {
-			    new_block.prev = new_block.current;
-			    new_block.next = new_block.current;
-			} else {
-			    new_block.prev = list_head_pointer->prev;
-			    list_head_pointer->prev->next = &new_block;
-                list_head_pointer->prev = &new_block;
-                new_block.next = list_head_pointer;
-			}
-			freeList[2] = &new_block;
-			break;
-
-		case 5:
-		case 6:
-		case 7:
-		case 8:
-			list_head_pointer = freeList[3] ;
-			//list_head  =  (freeBlock)*list_head_pointer;
-			if(list_head_pointer == NULL) {
-			    new_block.prev = new_block.current;
-			    new_block.next = new_block.current;
-			} else {
-			    new_block.prev = list_head_pointer->prev;
-			    list_head_pointer->prev->next = &new_block;
-                list_head_pointer->prev = &new_block;
-                new_block.next = list_head_pointer;
-			}
-			freeList[3] = &new_block;
-			break;
-		case 9:
-		case 10:
-		case 11:
-		case 12:
-		case 13:
-		case 14:
-		case 15:
-		case 16:
-			list_head_pointer = freeList[4] ;
-			//list_head  =  (freeBlock)*list_head_pointer;
-			if(list_head_pointer == NULL) {
-			    new_block.prev = new_block.current;
-			    new_block.next = new_block.current;
-			} else {
-			    new_block.prev = list_head_pointer->prev;
-			    list_head_pointer->prev->next = &new_block;
-                list_head_pointer->prev = &new_block;
-                new_block.next = list_head_pointer;
-			}
-			freeList[4] = &new_block;
-		default:
-			printf("\nInvalid size for placement in free list.\n");
-			printf("\nThe size is %d \n" , (int) block_size);
-
-			break;
-
-	}*/
 
 }
 
@@ -579,101 +462,37 @@ static void
 remove_from_free_list(void* bp) {
 
 	//struct freeBlock *old_block;
-	struct freeBlock *curr_block;
+	//struct freeBlock *curr_block;
 	int block_size = GET_SIZE(HDRP(bp))/WSIZE;
 	int index = GET_INDEX(block_size);
+	//NOTE: not sure how to derefence pointers in the array
+    (void *) list_ptr = *(ptr_list[index]);
 
-	curr_block = freeList[index];
-			while(curr_block != NULL) {
-				if (curr_block->current == bp){
-					curr_block->prev->next = curr_block->next;
-					curr_block->next->prev = curr_block->prev;
+
+			while(list_ptr != NULL) {
+				//if (curr_block->current == bp){
+				//check for removable bp in list
+				//NEED TO CHECK if this is correct comparison method
+				if(list_ptr == bp) {
+				    //get pointers to bp's previous and next
+				    void * bp_prev = GET(bp);
+				    void * bp_next = GET(bp + WSIZE);
+
+				    //in order to delete bp, we assign bp's previous's next to point to bp's next
+				    //we also assign bp's next's previous to be bp's previous
+				    PUT(bp_prev + WSIZE, bp_next);
+				    PUT(bp_next, bp_prev);
+
+//					curr_block->prev->next = curr_block->next;
+//					curr_block->next->prev = curr_block->prev;
 					break;
 				}
-				curr_block = curr_block->next;
+				//reassign the list_ptr to move down the list
+				list_ptr = GET(list_ptr + WSIZE);
+				//curr_block = curr_block->next;
 			}
 
-
-	/*switch(block_size)
-	{
-		case 1:
-		case 2:
-			curr_block = freeList[0];
-			while(curr_block != NULL) {
-				if (curr_block->current == bp){
-					curr_block->prev->next = curr_block->next;
-					curr_block->next->prev = curr_block->prev;
-					break;
-				}
-				curr_block = curr_block->next;
-			}
-			break;
-
-		case 3:
-			curr_block = freeList[1];
-			while(curr_block != NULL) {
-				if (curr_block->current == bp){
-					curr_block->prev->next = curr_block->next;
-					curr_block->next->prev = curr_block->prev;
-					break;
-				}
-				curr_block = curr_block->next;
-			}
-			break;
-
-		case  4:
-			curr_block = freeList[2];
-			while(curr_block != NULL) {
-				if (curr_block->current == bp){
-					curr_block->prev->next = curr_block->next;
-					curr_block->next->prev = curr_block->prev;
-					break;
-				}
-				curr_block = curr_block->next;
-			}
-			
-			break;
-
-		case 5:
-		case 6:
-		case 7:
-		case 8:
-			curr_block = freeList[3];
-			while(curr_block != NULL) {
-				if (curr_block->current == bp){
-					curr_block->prev->next = curr_block->next;
-					curr_block->next->prev = curr_block->prev;
-					break;
-				}
-				curr_block = curr_block->next;
-			}
-			break;
-		case 9:
-		case 10:
-		case 11:
-		case 12:
-		case 13:
-		case 14:
-		case 15:
-		case 16:
-			curr_block = freeList[4];
-			while(curr_block != NULL) {
-				if (curr_block->current == bp){
-					curr_block->prev->next = curr_block->next;
-					curr_block->next->prev = curr_block->prev;
-					break;
-				}
-				curr_block = curr_block->next;
-			}
-			break;
-		default:
-			printf("\nInvalid size for removal from list.\n");
-			printf("\nThe size is %d \n" , (int) block_size);
-
-			break;
-
-	}*/
-}	
+}
 
 /*
  * Requires:
@@ -694,152 +513,37 @@ find_fit(size_t asize)
 	//struct freeBlock a_block;
 	struct freeBlock *curr_block;
 	int first_index = GET_SIZE(asize);
+	void * list_ptr;
 	
 	/* find appropriate size range beginning at smallest possible fit, repopulate size range if neccesary*/
-	for (int index = first_index ; index < 6; index ++) {		
-		curr_block = freeList[index];
-	
-		/* if no memory of appropriate size range available create memory and take first block*/
-		if (curr_block == NULL ) {
-			/* Extend the empty heap with a free block of CHUNKSIZE bytes. */
-			if ((new_mem_location = extend_heap(CHUNKSIZE/2)) == NULL){
-				return NULL;
-			}
-			
-			curr_block = freeList[index];
-			return curr_block->current;
-		}
+	for (int index = first_index ; index < 6; index ++) {
+		//curr_block = freeList[index];
+        list_ptr = *(ptr_list[index]);
+
 		/* if memory is available in size range iterate to find block large enough*/
-		while(curr_block != NULL) {
-			if (curr_block->size >= asize){
-
-				return curr_block->current;
+		while(list_ptr != NULL) {
+			if (GET_SIZE(list_ptr) >= asize){
+				return list_ptr;
+//				return curr_block->current;
 			}
-			curr_block = curr_block->next;
+			//get next pointer to iterate through list
+			list_ptr = GET(list_ptr + WSIZE);
+			//curr_block = curr_block->next;
 		}
 
 	}
-	return NULL;
 
-
-
-
-
-
-
-
-
-
-
-
-	/*switch(asize)
-	{
-		case 1:
-		case 2:
-			 
-			curr_block = freeList[0];
-			
-			if (curr_block == NULL ) {
-				// request new page of memory and add to free list for size range
-				//freeList[0] += (2 * WSIZE);
-
-				// Extend the empty heap with a free block of CHUNKSIZE bytes. 
-				if ((new_mem_location = extend_heap(CHUNKSIZE/2)) == NULL){
-					return NULL;
-				}
-				
-				curr_block = freeList[0];
-				return curr_block->current;
-
-				//64/2...32
-
-
-				break;
-
-				
-
-
-			}
-			curr_block = freeList[0];
-
-			while(curr_block != NULL) {
-				if (curr_block->size >= asize){
-
-					return curr_block->current;
-					break;
-				}
-				curr_block = curr_block->next;
-			}
-			break;
-
-		case 3:
-			curr_block = freeList[1];
-			while(curr_block != NULL) {
-				if (curr_block->size >= asize){
-
-					return curr_block->current;
-					break;
-				}
-				curr_block = curr_block->next;
-			}
-			
-			break;
-
-		case  4:
-			curr_block = freeList[2];
-			while(curr_block != NULL) {
-				if (curr_block->size >= asize){
-
-					return curr_block->current;
-					break;
-				}
-				curr_block = curr_block->next;
-			}
-			
-			break;
-
-		case 5:
-		case 6:
-		case 7:
-		case 8:
-			curr_block = freeList[3];
-			while(curr_block != NULL) {
-				if (curr_block->size >= asize){
-
-					return curr_block->current;
-					break;
-				}
-				curr_block = curr_block->next;
-			}
-			
-			break;
-		case 9:
-		case 10:
-		case 11:
-		case 12:
-		case 13:
-		case 14:
-		case 15:
-		case 16:
-			curr_block = freeList[4];
-			while(curr_block != NULL) {
-				if (curr_block->size >= asize){
-
-					return curr_block->current;
-					break;
-				}
-				curr_block = curr_block->next;
-			}
-			
-			break;
-		default:
-			printf("\nInvalid size such that fit cannot be found.\n");
-			printf("\nThe size is %d \n" , (int) asize);
-			return NULL;
-			break;
-
-	}
-	return NULL;*/
+    /* if no memory of appropriate size range available create memory and take first block*/
+//    if (list_ptr == NULL ) {
+        /* Extend the empty heap with a free block of CHUNKSIZE bytes. */
+    if ((new_mem_location = extend_heap(CHUNKSIZE/WSIZE)) == NULL){
+        return NULL;
+    }
+    return new_mem_location;
+//    curr_block = freeList[index];
+//    return curr_block->current;
+//    }
+//	return NULL;
 }
 
 /* 
