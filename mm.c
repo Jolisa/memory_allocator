@@ -77,6 +77,8 @@ struct freeBlock{
 		void *current;
 		size_t size;
 };
+
+
 typedef volatile struct freeBlock *freeBlockp;
 
 //static int *free_list[5];
@@ -84,6 +86,15 @@ typedef volatile struct freeBlock *freeBlockp;
 //static struct freeBlock **freeList;
 //do we point? to the pointer list?
 static int **ptr_list;
+
+//we're going to initialize a struct that contains pointers to the next and prev structs
+struct links {
+    struct links *prev;
+    struct links *next;
+};
+
+struct freeBlock *array_heads;
+
 
 
 /* Function prototypes for internal helper routines: */
@@ -134,6 +145,8 @@ mm_init(void)
 	/* Create the initial empty heap. */
 	//if ((free_list[0] = mem_sbrk(4 * WSIZE)) == (void *)-1){
 	//freeList = mm_malloc(sizeof *freeList);
+	//leave some space for the array of dummy headers
+	if ((array_heads = mem_sbrk()))
 	if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1){
 		return (-1);
 	}
