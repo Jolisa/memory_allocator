@@ -107,7 +107,8 @@ static void place_in_free_list(void* bp);
 /* Function prototypes for heap consistency checker routines: */
 static void checkblock(void *bp);
 static void checkheap(bool verbose);
-static void printblock(void *bp); 
+static void printblock(void *bp);
+static void print_free_list();
 static void remove_from_free_list(void* bp);
 
 
@@ -195,7 +196,7 @@ mm_malloc(size_t size)
 
 	/* Adjust block size to include overhead and alignment reqs. */
 	if (size <= DSIZE)
-	    asize = 4 * DSIZE;
+	    asize = 2 * DSIZE;
 	//trying out 4
 //		asize = 2 * DSIZE;
 
@@ -206,6 +207,7 @@ mm_malloc(size_t size)
 
 	if ((bp = find_fit(asize)) != NULL) {
 		place(bp, asize);
+		printf("finished malloc-ing with a block of adjusted size: %d\n", (int) asize);
 		return (bp);
 	}
 
@@ -314,12 +316,12 @@ coalesce(void *bp)
 	bool next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
 	//printf("\nThis is the initial size of the new block in coalesce %d \n", bp);
 
-	if (prev_alloc && next_alloc) {                 /* Case 1 */
+	if (prev_alloc && next_alloc) {                 /* Case 1 - no coalescing*/
 		printf("\n1: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
 		place_in_free_list((bp));
 
 		return (bp);
-	} else if (prev_alloc && !next_alloc) {         /* Case 2 */
+	} else if (prev_alloc && !next_alloc) {         /* Case 2 - coalesce with next block (on right) */
 		size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
 		remove_from_free_list(NEXT_BLKP(bp));
 		//should we leave this as it was here or keep the change to move it down??
@@ -330,7 +332,7 @@ coalesce(void *bp)
 		place_in_free_list((bp));
 	
 
-	} else if (!prev_alloc && next_alloc) {         /* Case 3 */
+	} else if (!prev_alloc && next_alloc) {         /* Case 3 - coalesce with previous block (on left) */
 		size += GET_SIZE(HDRP(PREV_BLKP(bp)));
 		remove_from_free_list(PREV_BLKP(bp));
 		PUT(FTRP(bp), PACK(size, 0));
@@ -338,7 +340,7 @@ coalesce(void *bp)
 		bp = PREV_BLKP(bp);
 		printf("\n3: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
 		place_in_free_list((bp));
-	} else {                                        /* Case 4 */
+	} else {                                        /* Case 4 - coalesce with both prev and next blocks */
 		size += GET_SIZE(HDRP(PREV_BLKP(bp))) + 
 		    GET_SIZE(FTRP(NEXT_BLKP(bp)));
 		remove_from_free_list(NEXT_BLKP(bp));
@@ -365,12 +367,13 @@ static void *
 extend_heap(size_t words) 
 {
 	size_t size;
-	printf("\nThis is the word size passed to extend_heap %d\n", (int) words);
+	printf("\nThis is the number of words of sz 8 passed into extend_heap %d\n", (int) words);
 
 	void *bp;
 
 	/* Allocate an even number of words to maintain alignment. */
 	//do we need to make changes to our freeList here?? are multiple blocks created here?
+	//Check whether 2 needs to be 4
 	size = (words % 2) ? (words + 1) * WSIZE : words * WSIZE;
 	if ((bp = mem_sbrk(size)) == (void *)-1)  
 		return (NULL);
@@ -399,7 +402,7 @@ place_in_free_list(void* bp) {
 
     struct freeBlock *dummy_head;
     size_t block_size;
-    block_size = GET_SIZE(HDRP(bp))/WSIZE;
+    block_size = GET_SIZE(HDRP(bp));
 	int index = GET_INDEX(block_size);
 	struct freeBlock *new_block = bp;
 
@@ -423,8 +426,7 @@ remove_from_free_list(void* bp) {
 
     printf("starting remove from free list\n");
 
-	int block_size = GET_SIZE(HDRP(bp))/WSIZE;
-	printf("value of WSIZE is: %d\n", (int)WSIZE);
+	int block_size = GET_SIZE(HDRP(bp));
 	int index = GET_INDEX(block_size);
     struct freeBlock *dummy_head = &array_heads[index];
     struct freeBlock * current = dummy_head->next;
@@ -436,17 +438,13 @@ remove_from_free_list(void* bp) {
                 break;
             }
             current = current->next;
-
         }
             printf("Finished removing from free list with size: %d\n", (int)block_size);
-
-
 }
 
 /*
  * Requires:
  *   None.
- *
  * Effects:
  *   Find a fit for a block with "asize" bytes.  Returns that block's address
  *   or NULL if no suitable block was found. 
@@ -454,20 +452,22 @@ remove_from_free_list(void* bp) {
 static void *
 find_fit(size_t asize)
 {
-    printf("Starting found fit func\n");
+    printf("Starting found fit func on size: %d\n", (int) asize);
+    print_free_list();
 
 	struct freeBlock *current;
 	int first_index = GET_INDEX(asize);
 	struct freeBlock *dummy_head;
-	void *new_mem_location;
+//	void *new_mem_location;
 
 	/* find appropriate size range beginning at smallest possible fit, repopulate size range if neccesary*/
-	for (int index = first_index ; index < 10; index ++) {
+	for (int index = first_index ; index < 10; index++) {
         dummy_head = &array_heads[index];
         current = dummy_head->next;
 		/* if memory is available in size range iterate to find block large enough*/
 		while(current != dummy_head) {
-			if (GET_SIZE(current) >= asize){
+		    //WANTED TO TRY GET_SIZE(HDRP(current)), but that didn't work
+			if (GET_SIZE(HDRP(current)) >= asize){
 			    printf("found fit!\n");
 				return current;
 			}
@@ -476,13 +476,19 @@ find_fit(size_t asize)
 
 	}
 
-    /* if no memory of appropriate size range available create memory and take first block*/
-    if ((new_mem_location = extend_heap(CHUNKSIZE/WSIZE)) == NULL){
-        return NULL;
-    }
-    printf("Finished finding fit and had to extend the heap\n");
+	printf("could not find fit, need to extend heap\n");
 
-    return new_mem_location;
+	return NULL;
+
+
+//
+//    /* if no memory of appropriate size range available create memory and take first block*/
+//    if ((new_mem_location = extend_heap(CHUNKSIZE/WSIZE)) == NULL){
+//        return NULL;
+//    }
+//    printf("Finished finding fit and had to extend the heap\n");
+//
+//    return new_mem_location;
 
 
 
@@ -597,4 +603,22 @@ printblock(void *bp)
 	printf("%p: header: [%zu:%c] footer: [%zu:%c]\n", bp, 
 	    hsize, (halloc ? 'a' : 'f'), 
 	    fsize, (falloc ? 'a' : 'f'));
+}
+
+static void
+print_free_list()
+{
+    printf("\n\nAbout to print out the free list\n");
+    struct freeBlock *dummy_head;
+    struct freeBlock *current;
+    int i;
+    for (i = 0; i < 10; i++) {
+        dummy_head = &array_heads[i];
+        current = dummy_head->next;
+        while(current != dummy_head) {
+            printf("\nThe size of free block is: %d\n", (int) GET_SIZE(HDRP(current)));
+            current = current->next;
+        }
+    }
+    printf("finished printing free list\n\n");
 }
