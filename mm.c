@@ -66,7 +66,7 @@ team_t team = {
 #define PREV_BLKP(bp)  ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
 /*Given a size, return pointer to index for given size range in freeList */
-#define GET_INDEX(size)  ((size) == (0) ? (-1) : (size) < (3) ? (0) : (size) < (4) ? (1) : (size) < (5) ? (2) : (size) < (9) ? (3) : (size) < (17) ? (4) : (5)) 
+#define GET_INDEX(size)  ((size) == (0) ? (-1) : (size) < (3) ? (0) : (size) < (5) ? (1) : (size) < (9) ? (2) : (size) < (17) ? (3) : (size) < (33) ? (4) : (size) < (65) ? (5) : (size) < (129) ? (6) : (size) < (257) ? (7) : (size) < (513) ? (8) : (9))
 
 /* Global variables: */
 static char *heap_listp; /* Pointer to first block */  
@@ -74,7 +74,7 @@ static char *heap_listp; /* Pointer to first block */
 struct freeBlock{
 		struct freeBlock *prev;
 		struct freeBlock *next;		
-		void *current;
+		//void *current;
 		size_t size;
 };
 
@@ -85,7 +85,7 @@ typedef volatile struct freeBlock *freeBlockp;
 //static int (*free_lis);
 //static struct freeBlock **freeList;
 //do we point? to the pointer list?
-static int **ptr_list;
+//static int **ptr_list;
 
 //we're going to initialize a struct that contains pointers to the next and prev structs
 struct links {
@@ -143,10 +143,19 @@ mm_init(void)
 {
 
 	/* Create the initial empty heap. */
-	//if ((free_list[0] = mem_sbrk(4 * WSIZE)) == (void *)-1){
-	//freeList = mm_malloc(sizeof *freeList);
 	//leave some space for the array of dummy headers
-	if ((array_heads = mem_sbrk()))
+	//technically the space needed is (2 X WSIZE) for each of the freeblock heads
+	if ((array_heads = mem_sbrk(10 * sizeof(struct freeBlock))) == (void *)-1) {
+	    return (-1);
+	}
+	//create the dummy heads array -> each head points to itself
+	int i;
+    for(i = 0; i < 10; i++) {
+        array_heads[i].prev = &array_heads[i];
+        array_heads[i].next = &array_heads[i];
+    }
+
+
 	if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1){
 		return (-1);
 	}
@@ -161,12 +170,6 @@ mm_init(void)
 	if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
 		return (-1);
 
-	//want it to be a list of pointers, currently don't know how
-	//Need to check initialization process for ptr_list
-	ptr_list = new int[6];
-
-	PUT(heap_listp, PACK(sizeof(ptr_list),1));
-	heap_listp += sizeof(ptr_list);
 	return (0);
 }
 /* 
@@ -181,6 +184,7 @@ mm_init(void)
 void *
 mm_malloc(size_t size) 
 {
+    printf("Starting to malloc a block of size: %d\n", (int) size);
 	size_t asize;      /* Adjusted block size */
 	size_t extendsize; /* Amount to extend heap if no fit */
 	void *bp;
@@ -191,7 +195,10 @@ mm_malloc(size_t size)
 
 	/* Adjust block size to include overhead and alignment reqs. */
 	if (size <= DSIZE)
-		asize = 2 * DSIZE;
+	    asize = 4 * DSIZE;
+	//trying out 4
+//		asize = 2 * DSIZE;
+
 	else
 		asize = DSIZE * ((size + DSIZE + (DSIZE - 1)) / DSIZE);
 
@@ -208,6 +215,7 @@ mm_malloc(size_t size)
 		return (NULL);
 		
 	place(bp, asize);
+	printf("finished malloc-ing a block of adjusted size: %d\n", (int) asize);
 	return (bp);
 } 
 
@@ -223,7 +231,6 @@ mm_free(void *bp)
 {
 	size_t size;
 
-
 	/* Ignore spurious requests. */
 	if (bp == NULL)
 		return;
@@ -233,8 +240,7 @@ mm_free(void *bp)
 	PUT(HDRP(bp), PACK(size, 0));
 	PUT(FTRP(bp), PACK(size, 0));
 	coalesce(bp);
-	/*coalesced_address = coalesce(bp);
-	place_in_free_list(coalesced_address);*/
+
 }
 
 /*
@@ -253,6 +259,8 @@ mm_free(void *bp)
 void *
 mm_realloc(void *ptr, size_t size)
 {
+
+    printf("Realloc happening\n");
 	size_t oldsize;
 	void *newptr;
 
@@ -281,6 +289,8 @@ mm_realloc(void *ptr, size_t size)
 	/* Free the old block. */
 	mm_free(ptr);
 
+	printf("finished realloc");
+
 	return (newptr);
 }
 
@@ -307,6 +317,7 @@ coalesce(void *bp)
 	if (prev_alloc && next_alloc) {                 /* Case 1 */
 		printf("\n1: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
 		place_in_free_list((bp));
+
 		return (bp);
 	} else if (prev_alloc && !next_alloc) {         /* Case 2 */
 		size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
@@ -369,14 +380,6 @@ extend_heap(size_t words)
 	PUT(FTRP(bp), PACK(size, 0));         /* Free block footer */
 	PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /* New epilogue header */
 
-	
-
-	/* Coalesce if the previous block was free. */
-	/*coalesced_address = coalesce(bp);
-	place_in_free_list(coalesced_address);*/
-
-
-
 	return (coalesce(bp));
 }
 
@@ -392,79 +395,23 @@ extend_heap(size_t words)
 static void 
 place_in_free_list(void* bp) {
 
-    //need to move the pointer to the first free area?
-	//may need to check on adding HDR location - does it move, and how do we get it?
-	//are we overwriting the header?
-	//bp = bp + sizeof(struct freeBlock);
-	//struct freeBlock list_head;
-	//struct freeBlock* list_head_pointer;
-	//int* list_head_pointer;
-	//struct freeBlock *list_head_pointer;
-    //struct freeBlock *new_block = bp;
-    (void *)list_head_pointer;
+    printf("Starting place in free list\n");
+
+    struct freeBlock *dummy_head;
     size_t block_size;
-	int index;
-
-
-
-	//block_size = NEXT_BLKP(bp) - bp;
-//	block_size = GET_SIZE(HDRP(bp))/WSIZE;
-//    //put in header and footer? NEED TO CHECK correctness
-//    PUT(HDRP(bp), PACK(block_size, 0));
-//    PUT(FTRP(bp), PACK(block_size, 0));
-//	printf("\nThis is the wsize in place in freeList %d\n" , (int) WSIZE);
-//	printf("\nThis is the block size in place in freeList %d\n" , (int) block_size);
-//	new_block->current = bp;
-//	new_block->size = block_size;
-//	//freeList = mm_malloc(sizeof *freeList);
-//    printf("newblock is getting some sort of assignment");
-
     block_size = GET_SIZE(HDRP(bp))/WSIZE;
-	
-//	for (int i = 0; i < 6; i++) {
-//		printf("\nThis is something in freeList %p\n at index i %d\n" , freeList[i], i);
-//	}
+	int index = GET_INDEX(block_size);
+	struct freeBlock *new_block = bp;
 
-	index = GET_INDEX(block_size);
+	dummy_head = &array_heads[index];
+	new_block->prev = dummy_head;
+	new_block->next = dummy_head->next;
+	dummy_head->next->prev = new_block;
+	dummy_head->next = new_block;
 
-	list_head_pointer = *(ptr_list[index]) ;
-		
-	printf("\n1\n");
-	//list_head  =  (freeBlock)*list_head_pointer;
-	if(list_head_pointer == NULL) {
-//	    new_block->prev = new_block;
-//	    new_block->next = new_block;
-        PUT(bp, bp);
-        PUT(bp + WSIZE, bp);
-        ptr_list[index] = *bp;
+	printf("Finished placing into free list with size: %d and next address is: %p\n", (int)block_size, new_block);
 
-	} else {
-		printf("\n3\n");
-//	    new_block->prev = list_head_pointer->prev;
-//        void * other_prev_next = GET(other_prev + WSIZE);
-        //assigns the head's previous to bp previous
-	    void * head_prev = GET(list_head_pointer);
-	    PUT(bp, head_prev);
-        //assign head's previous to bp
-        PUT(head_prev, bp);
-
-	    //assign the "current" head to bp next
-	    PUT(bp + WSIZE, list_head_pointer);
-	    //assign current's previous to bp
-	    PUT(list_head_pointer, bp);
-
-
-
-//	    list_head_pointer->prev->next = new_block;
-//        list_head_pointer->prev = new_block;
-//        new_block->next = list_head_pointer;
-	}
-	printf("\n4\n");
-	ptr_list[index] = *bp;
-	//freeList[index] = new_block;
-	printf("\n5\n");
-
-}
+}//place in free list
 
 /*
 * Requires: pointer to free memory block
@@ -474,36 +421,25 @@ place_in_free_list(void* bp) {
 static void 
 remove_from_free_list(void* bp) {
 
-	//struct freeBlock *old_block;
-	//struct freeBlock *curr_block;
+    printf("starting remove from free list\n");
+
 	int block_size = GET_SIZE(HDRP(bp))/WSIZE;
+	printf("value of WSIZE is: %d\n", (int)WSIZE);
 	int index = GET_INDEX(block_size);
-	//NOTE: not sure how to derefence pointers in the array
-    (void *) list_ptr = *(ptr_list[index]);
+    struct freeBlock *dummy_head = &array_heads[index];
+    struct freeBlock * current = dummy_head->next;
 
+        while(current != dummy_head) {
+            if(current == bp) { //if we find the block to delete
+                current->prev->next = current->next;
+                current->next->prev = current->prev;
+                break;
+            }
+            current = current->next;
 
-			while(list_ptr != NULL) {
-				//if (curr_block->current == bp){
-				//check for removable bp in list
-				//NEED TO CHECK if this is correct comparison method
-				if(list_ptr == bp) {
-				    //get pointers to bp's previous and next
-				    void * bp_prev = GET(bp);
-				    void * bp_next = GET(bp + WSIZE);
+        }
+            printf("Finished removing from free list with size: %d\n", (int)block_size);
 
-				    //in order to delete bp, we assign bp's previous's next to point to bp's next
-				    //we also assign bp's next's previous to be bp's previous
-				    PUT(bp_prev + WSIZE, bp_next);
-				    PUT(bp_next, bp_prev);
-
-//					curr_block->prev->next = curr_block->next;
-//					curr_block->next->prev = curr_block->prev;
-					break;
-				}
-				//reassign the list_ptr to move down the list
-				list_ptr = GET(list_ptr + WSIZE);
-				//curr_block = curr_block->next;
-			}
 
 }
 
@@ -518,45 +454,38 @@ remove_from_free_list(void* bp) {
 static void *
 find_fit(size_t asize)
 {
-	//PPRRROOBBBSS SHOULDNT BE COMMENTED OUT
-	//void *bp;
-	void *new_mem_location; 
-	//?? OR
-	//char *new_mem_location; 
-	//struct freeBlock a_block;
-	struct freeBlock *curr_block;
-	int first_index = GET_SIZE(asize);
-	void * list_ptr;
-	
-	/* find appropriate size range beginning at smallest possible fit, repopulate size range if neccesary*/
-	for (int index = first_index ; index < 6; index ++) {
-		//curr_block = freeList[index];
-        list_ptr = *(ptr_list[index]);
+    printf("Starting found fit func\n");
 
+	struct freeBlock *current;
+	int first_index = GET_INDEX(asize);
+	struct freeBlock *dummy_head;
+	void *new_mem_location;
+
+	/* find appropriate size range beginning at smallest possible fit, repopulate size range if neccesary*/
+	for (int index = first_index ; index < 10; index ++) {
+        dummy_head = &array_heads[index];
+        current = dummy_head->next;
 		/* if memory is available in size range iterate to find block large enough*/
-		while(list_ptr != NULL) {
-			if (GET_SIZE(list_ptr) >= asize){
-				return list_ptr;
-//				return curr_block->current;
+		while(current != dummy_head) {
+			if (GET_SIZE(current) >= asize){
+			    printf("found fit!\n");
+				return current;
 			}
-			//get next pointer to iterate through list
-			list_ptr = GET(list_ptr + WSIZE);
-			//curr_block = curr_block->next;
+			current = current->next;
 		}
 
 	}
 
     /* if no memory of appropriate size range available create memory and take first block*/
-//    if (list_ptr == NULL ) {
-        /* Extend the empty heap with a free block of CHUNKSIZE bytes. */
     if ((new_mem_location = extend_heap(CHUNKSIZE/WSIZE)) == NULL){
         return NULL;
     }
+    printf("Finished finding fit and had to extend the heap\n");
+
     return new_mem_location;
-//    curr_block = freeList[index];
-//    return curr_block->current;
-//    }
-//	return NULL;
+
+
+
 }
 
 /* 
@@ -573,7 +502,7 @@ place(void *bp, size_t asize)
 {
 	size_t csize = GET_SIZE(HDRP(bp));   
 
-	if ((csize - asize) >= (2 * DSIZE)) { 
+	if ((csize - asize) >= (4 * DSIZE)) {
 		PUT(HDRP(bp), PACK(asize, 1));
 		PUT(FTRP(bp), PACK(asize, 1));
 		remove_from_free_list(bp);
