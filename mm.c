@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #include "memlib.h"
 #include "mm.h"
@@ -66,8 +67,9 @@ team_t team = {
 #define PREV_BLKP(bp)  ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
 /*Given a size, return pointer to index for given size range in freeList */
-#define GET_INDEX(size)  ((size) == (0) ? (-1) : (size) < (3) ? (0) : (size) < (5) ? (1) : (size) < (9) ? (2) : (size) < (17) ? (3) : (size) < (33) ? (4) : (size) < (65) ? (5) : (size) < (129) ? (6) : (size) < (257) ? (7) : (size) < (513) ? (8) : (9))
-
+//#define GET_INDEX(size) ((size) == (0) ? (-1) : (size) < (3) ? (0) : (size) < (5) ? (1) : (size) < (9) ? (2) : (size) < (17) ? (3) : (size) < (33) ? (4) : (size) < (65) ? (5) : (size) < (129) ? (6) : (size) < (257) ? (7) : (size) < (513) ? (8) : (9))
+#define GET_INDEX(size) ceil(log(size)/log(2));
+//#define GET_INDEX(size) ceil((float)size/100.0);
 /* Global variables: */
 static char *heap_listp; /* Pointer to first block */  
 
@@ -95,6 +97,8 @@ struct links {
 
 struct freeBlock *array_heads;
 
+int free_list_size = 100;
+
 
 
 /* Function prototypes for internal helper routines: */
@@ -108,7 +112,7 @@ static void place_in_free_list(void* bp);
 static void checkblock(void *bp);
 static void checkheap(bool verbose);
 static void printblock(void *bp);
-static void print_free_list();
+//static void print_free_list();
 static void remove_from_free_list(void* bp);
 
 
@@ -146,12 +150,12 @@ mm_init(void)
 	/* Create the initial empty heap. */
 	//leave some space for the array of dummy headers
 	//technically the space needed is (2 X WSIZE) for each of the freeblock heads
-	if ((array_heads = mem_sbrk(10 * sizeof(struct freeBlock))) == (void *)-1) {
+	if ((array_heads = mem_sbrk(free_list_size * sizeof(struct freeBlock))) == (void *)-1) {
 	    return (-1);
 	}
 	//create the dummy heads array -> each head points to itself
 	int i;
-    for(i = 0; i < 10; i++) {
+    for(i = 0; i < free_list_size; i++) {
         array_heads[i].prev = &array_heads[i];
         array_heads[i].next = &array_heads[i];
     }
@@ -185,10 +189,12 @@ mm_init(void)
 void *
 mm_malloc(size_t size) 
 {
-    printf("Starting to malloc a block of size: %d\n", (int) size);
+//    printf("Starting to malloc a block of size: %d\n", (int) size);
 	size_t asize;      /* Adjusted block size */
 	size_t extendsize; /* Amount to extend heap if no fit */
 	void *bp;
+
+//	printf("The size we want to malloc is: %d\n", (int)size);
 
 	/* Ignore spurious requests. */
 	if (size == 0)
@@ -202,7 +208,7 @@ mm_malloc(size_t size)
 
 	else {
 	    asize = DSIZE * ((size + DSIZE + (DSIZE - 1)) / DSIZE);
-	    printf("Adjusted input size to asize: %d\n", (int) asize);
+//	    printf("Adjusted input size to asize: %d\n", (int) asize);
 
 	}
 
@@ -210,8 +216,9 @@ mm_malloc(size_t size)
 
 	if ((bp = find_fit(asize)) != NULL) {
 		place(bp, asize);
-		printf("finished malloc-ing with a block of adjusted size: %d\n", (int) asize);
-		print_free_list();
+//		printf("finished malloc-ing with a block of adjusted size: %d\n", (int) asize);
+//		print_free_list();
+//		printf("This is the block returned to be malloc-ed: %p\n", bp);
 		return (bp);
 	}
 
@@ -221,8 +228,10 @@ mm_malloc(size_t size)
 		return (NULL);
 		
 	place(bp, asize);
-	printf("finished malloc-ing a block of adjusted size: %d\n", (int) asize);
-	print_free_list();
+//	printf("finished malloc-ing a block of adjusted size: %d\n", (int) asize);
+//	print_free_list();
+//	printf("This is the block returned to be malloc-ed: %p\n", bp);
+
 	return (bp);
 } 
 
@@ -246,7 +255,8 @@ mm_free(void *bp)
 	size = GET_SIZE(HDRP(bp));
 	PUT(HDRP(bp), PACK(size, 0));
 	PUT(FTRP(bp), PACK(size, 0));
-	coalesce(bp);
+	place_in_free_list(bp);
+//	coalesce(bp);
 
 }
 
@@ -267,7 +277,7 @@ void *
 mm_realloc(void *ptr, size_t size)
 {
 
-    printf("Realloc happening\n");
+//    printf("Realloc happening\n");
 	size_t oldsize;
 	void *newptr;
 
@@ -296,7 +306,7 @@ mm_realloc(void *ptr, size_t size)
 	/* Free the old block. */
 	mm_free(ptr);
 
-	printf("finished realloc");
+//	printf("finished realloc");
 
 	return (newptr);
 }
@@ -322,7 +332,7 @@ coalesce(void *bp)
 	//printf("\nThis is the initial size of the new block in coalesce %d \n", bp);
 
 	if (prev_alloc && next_alloc) {                 /* Case 1 - no coalescing*/
-		printf("\n1: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
+//		printf("\n1: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
 		place_in_free_list((bp));
 
 		return (bp);
@@ -333,7 +343,7 @@ coalesce(void *bp)
 		//place_in_free_list(bp);
 		PUT(HDRP(bp), PACK(size, 0));
 		PUT(FTRP(bp), PACK(size, 0));
-		printf("\n2: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
+//		printf("\n2: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
 		place_in_free_list((bp));
 	
 
@@ -343,7 +353,7 @@ coalesce(void *bp)
 		PUT(FTRP(bp), PACK(size, 0));
 		PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
 		bp = PREV_BLKP(bp);
-		printf("\n3: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
+//		printf("\n3: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
 		place_in_free_list((bp));
 	} else {                                        /* Case 4 - coalesce with both prev and next blocks */
 		size += GET_SIZE(HDRP(PREV_BLKP(bp))) + 
@@ -353,12 +363,28 @@ coalesce(void *bp)
 		PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
 		PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
 		bp = PREV_BLKP(bp);
-		printf("\n4: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
+//		printf("\n4: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
 		place_in_free_list((bp));
 	}
 	return (bp);
 }
 
+
+/*
+ * Requires:
+ *   "bp" is the address of a newly freed block.
+ *
+ * Effects:
+ *   Perform boundary tag coalescing.  Returns the address of the coalesced
+ *   block.
+ */
+static void *
+coalesce_all()
+{
+    int i;
+    for(i = 0; i )
+
+ }
 
 
 /* 
@@ -372,7 +398,7 @@ static void *
 extend_heap(size_t words) 
 {
 	size_t size;
-	printf("\nThis is the number of words of sz 8 passed into extend_heap %d\n", (int) words);
+//	printf("\nThis is the number of words of sz 8 passed into extend_heap %d\n", (int) words);
 
 	void *bp;
 
@@ -403,7 +429,7 @@ extend_heap(size_t words)
 static void 
 place_in_free_list(void* bp) {
 
-    printf("Starting place in free list\n");
+//    printf("Starting place in free list\n");
 
     struct freeBlock *dummy_head;
     size_t block_size;
@@ -417,7 +443,7 @@ place_in_free_list(void* bp) {
 	dummy_head->next->prev = new_block;
 	dummy_head->next = new_block;
 
-	printf("Finished placing into free list with size: %d and next address is: %p\n", (int)block_size, new_block);
+//	printf("Finished placing into free list with size: %d and next address is: %p\n", (int)block_size, new_block);
 
 }//place in free list
 
@@ -429,7 +455,7 @@ place_in_free_list(void* bp) {
 static void 
 remove_from_free_list(void* bp) {
 
-    printf("starting remove from free list\n");
+//    printf("starting remove from free list\n");
 
 	int block_size = GET_SIZE(HDRP(bp));
 	int index = GET_INDEX(block_size);
@@ -444,7 +470,7 @@ remove_from_free_list(void* bp) {
             }
             current = current->next;
         }
-            printf("Finished removing from free list with size: %d\n", (int)block_size);
+//            printf("Finished removing from free list with size: %d\n", (int)block_size);
 }
 
 /*
@@ -457,23 +483,24 @@ remove_from_free_list(void* bp) {
 static void *
 find_fit(size_t asize)
 {
-    printf("Starting found fit func on size: %d\n", (int) asize);
-    print_free_list();
+//    printf("Starting found fit func on size: %d\n", (int) asize);
+//    print_free_list();
 
 	struct freeBlock *current;
 	int first_index = GET_INDEX(asize);
+	printf("The index we are starting at is: %d\n", first_index);
 	struct freeBlock *dummy_head;
 //	void *new_mem_location;
 
 	/* find appropriate size range beginning at smallest possible fit, repopulate size range if neccesary*/
-	for (int index = first_index ; index < 10; index++) {
+	for (int index = first_index + 1 ; index < free_list_size; index++) {
         dummy_head = &array_heads[index];
         current = dummy_head->next;
 		/* if memory is available in size range iterate to find block large enough*/
 		while(current != dummy_head) {
 		    //WANTED TO TRY GET_SIZE(HDRP(current)), but that didn't work
 			if (GET_SIZE(HDRP(current)) >= asize){
-			    printf("found fit! of size: %d\n", (int) GET_SIZE(HDRP(current)));
+//			    printf("found fit! of size: %d\n", (int) GET_SIZE(HDRP(current)));
 				return current;
 			}
 			current = current->next;
@@ -481,7 +508,7 @@ find_fit(size_t asize)
 
 	}
 
-	printf("could not find fit, need to extend heap\n");
+//	printf("could not find fit, need to extend heap\n");
 
 	return NULL;
 
@@ -511,26 +538,27 @@ find_fit(size_t asize)
 static void
 place(void *bp, size_t asize)
 {
-	size_t csize = GET_SIZE(HDRP(bp));   
+	size_t csize = GET_SIZE(HDRP(bp));
+//	printf("We're about to PLACE, and the block we're placing into has size: %d\n", (int) csize);
 
 	if ((csize - asize) >= (4 * DSIZE)) {
-	    printf("\nPLACE FUNC - fragmenting block\n");
-	    print_free_list();
+//	    printf("\nPLACE FUNC - fragmenting block\n");
+//	    print_free_list();
+	    remove_from_free_list(bp);
 		PUT(HDRP(bp), PACK(asize, 1));
 		PUT(FTRP(bp), PACK(asize, 1));
-		remove_from_free_list(bp);
 		bp = NEXT_BLKP(bp);
 		PUT(HDRP(bp), PACK(csize - asize, 0));
 		PUT(FTRP(bp), PACK(csize - asize, 0));
 		place_in_free_list(bp);
-		print_free_list();
+//		print_free_list();
 	} else {
-	    printf("\nPLACE FUNC - not fragmenting block\n");
-	    print_free_list();
+//	    printf("\nPLACE FUNC - not fragmenting block\n");
+//	    print_free_list();
+	    remove_from_free_list(bp);
 		PUT(HDRP(bp), PACK(csize, 1));
 		PUT(FTRP(bp), PACK(csize, 1));
-		remove_from_free_list(bp);
-		print_free_list();
+//		print_free_list();
 	}
 }
 
@@ -618,20 +646,20 @@ printblock(void *bp)
 	    fsize, (falloc ? 'a' : 'f'));
 }
 
-static void
-print_free_list()
-{
-    printf("\n\nAbout to print out the free list\n");
-    struct freeBlock *dummy_head;
-    struct freeBlock *current;
-    int i;
-    for (i = 0; i < 10; i++) {
-        dummy_head = &array_heads[i];
-        current = dummy_head->next;
-        while(current != dummy_head) {
-            printf("\nThe size of free block is: %d, and the location is: %p\n", (int) GET_SIZE(HDRP(current)), current);
-            current = current->next;
-        }
-    }
-    printf("finished printing free list\n\n");
-}
+//static void
+//print_free_list()
+//{
+//    printf("\n\nAbout to print out the free list\n");
+//    struct freeBlock *dummy_head;
+//    struct freeBlock *current;
+//    int i;
+//    for (i = 0; i < 10; i++) {
+//        dummy_head = &array_heads[i];
+//        current = dummy_head->next;
+//        while(current != dummy_head) {
+//            printf("\nThe size of free block is: %d, and the location is: %p\n", (int) GET_SIZE(HDRP(current)), current);
+//            current = current->next;
+//        }
+//    }
+//    printf("finished printing free list\n\n");
+//}
