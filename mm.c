@@ -114,6 +114,7 @@ static void checkheap(bool verbose);
 static void printblock(void *bp);
 //static void print_free_list();
 static void remove_from_free_list(void* bp);
+static void coalesce_all(void);
 
 
 /* 
@@ -222,11 +223,21 @@ mm_malloc(size_t size)
 		return (bp);
 	}
 
+    coalesce_all();
+
+    if ((bp = find_fit(asize)) != NULL) {
+    		place(bp, asize);
+    //		printf("finished malloc-ing with a block of adjusted size: %d\n", (int) asize);
+    //		print_free_list();
+    //		printf("This is the block returned to be malloc-ed: %p\n", bp);
+    		return (bp);
+    	}
+
 	/* No fit found.  Get more memory and place the block. */
 	extendsize = MAX(asize, CHUNKSIZE);
 	if ((bp = extend_heap(extendsize / WSIZE)) == NULL)  
 		return (NULL);
-		
+
 	place(bp, asize);
 //	printf("finished malloc-ing a block of adjusted size: %d\n", (int) asize);
 //	print_free_list();
@@ -378,11 +389,32 @@ coalesce(void *bp)
  *   Perform boundary tag coalescing.  Returns the address of the coalesced
  *   block.
  */
-static void *
-coalesce_all()
+static void
+coalesce_all(void)
 {
-    int i;
-    for(i = 0; i )
+       printf("\n\nAbout to coalesce all of the free list\n");
+       void *bp;
+       bool prev_alloc;
+       bool next_alloc;
+       bp = heap_listp;
+       while (GET_SIZE(HDRP(bp))) {
+            if(!GET_ALLOC(HDRP(bp))) {
+            prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
+            next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
+            if(!prev_alloc || !next_alloc)
+                bp = coalesce(bp);
+            }
+            bp = NEXT_BLKP(bp);
+       }
+
+//       for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+//            if(!GET_ALLOC(HDRP(bp)))
+//            {
+//                bp = coalesce(bp);
+//            } //only coalesce if block is free
+//       }
+
+       printf("\n\nFinished coalescing all of the free list\n");
 
  }
 
@@ -398,7 +430,7 @@ static void *
 extend_heap(size_t words) 
 {
 	size_t size;
-//	printf("\nThis is the number of words of sz 8 passed into extend_heap %d\n", (int) words);
+	printf("\nThis is the number of words of sz 8 passed into extend_heap %d\n", (int) words);
 
 	void *bp;
 
@@ -414,6 +446,7 @@ extend_heap(size_t words)
 	PUT(FTRP(bp), PACK(size, 0));         /* Free block footer */
 	PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /* New epilogue header */
 
+    printf("Finished extending heap, going into coalesce now");
 	return (coalesce(bp));
 }
 
@@ -500,7 +533,7 @@ find_fit(size_t asize)
 		while(current != dummy_head) {
 		    //WANTED TO TRY GET_SIZE(HDRP(current)), but that didn't work
 			if (GET_SIZE(HDRP(current)) >= asize){
-//			    printf("found fit! of size: %d\n", (int) GET_SIZE(HDRP(current)));
+			    //printf("found fit! of size: %d\n", (int) GET_SIZE(HDRP(current)));
 				return current;
 			}
 			current = current->next;
@@ -508,7 +541,7 @@ find_fit(size_t asize)
 
 	}
 
-//	printf("could not find fit, need to extend heap\n");
+	//printf("could not find fit, need to extend heap\n");
 
 	return NULL;
 
