@@ -114,7 +114,7 @@ static void checkheap(bool verbose);
 static void printblock(void *bp);
 //static void print_free_list();
 static void remove_from_free_list(void* bp);
-static void coalesce_all(void);
+//static void coalesce_all(void);
 
 
 /* 
@@ -223,15 +223,15 @@ mm_malloc(size_t size)
 		return (bp);
 	}
 
-    coalesce_all();
-
-    if ((bp = find_fit(asize)) != NULL) {
-    		place(bp, asize);
-    //		printf("finished malloc-ing with a block of adjusted size: %d\n", (int) asize);
-    //		print_free_list();
-    //		printf("This is the block returned to be malloc-ed: %p\n", bp);
-    		return (bp);
-    	}
+//    coalesce_all();
+//
+//    if ((bp = find_fit(asize)) != NULL) {
+//    		place(bp, asize);
+//    //		printf("finished malloc-ing with a block of adjusted size: %d\n", (int) asize);
+//    //		print_free_list();
+//    //		printf("This is the block returned to be malloc-ed: %p\n", bp);
+//    		return (bp);
+//    	}
 
 	/* No fit found.  Get more memory and place the block. */
 	extendsize = MAX(asize, CHUNKSIZE);
@@ -267,7 +267,7 @@ mm_free(void *bp)
 	PUT(HDRP(bp), PACK(size, 0));
 	PUT(FTRP(bp), PACK(size, 0));
 	place_in_free_list(bp);
-//	coalesce(bp);
+	coalesce(bp);
 
 }
 
@@ -389,34 +389,34 @@ coalesce(void *bp)
  *   Perform boundary tag coalescing.  Returns the address of the coalesced
  *   block.
  */
-static void
-coalesce_all(void)
-{
-       printf("\n\nAbout to coalesce all of the free list\n");
-       void *bp;
-       bool prev_alloc;
-       bool next_alloc;
-       bp = heap_listp;
-       while (GET_SIZE(HDRP(bp))) {
-            if(!GET_ALLOC(HDRP(bp))) {
-            prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
-            next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
-            if(!prev_alloc || !next_alloc)
-                bp = coalesce(bp);
-            }
-            bp = NEXT_BLKP(bp);
-       }
-
-//       for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
-//            if(!GET_ALLOC(HDRP(bp)))
-//            {
+//static void
+//coalesce_all(void)
+//{
+//       printf("\n\nAbout to coalesce all of the free list\n");
+//       void *bp;
+//       bool prev_alloc;
+//       bool next_alloc;
+//       bp = heap_listp;
+//       while (GET_SIZE(HDRP(bp))) {
+//            if(!GET_ALLOC(HDRP(bp))) {
+//            prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
+//            next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
+//            if(!prev_alloc || !next_alloc)
 //                bp = coalesce(bp);
-//            } //only coalesce if block is free
+//            }
+//            bp = NEXT_BLKP(bp);
 //       }
-
-       printf("\n\nFinished coalescing all of the free list\n");
-
- }
+//
+////       for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+////            if(!GET_ALLOC(HDRP(bp)))
+////            {
+////                bp = coalesce(bp);
+////            } //only coalesce if block is free
+////       }
+//
+//       printf("\n\nFinished coalescing all of the free list\n");
+//
+// }
 
 
 /* 
@@ -430,7 +430,7 @@ static void *
 extend_heap(size_t words) 
 {
 	size_t size;
-	printf("\nThis is the number of words of sz 8 passed into extend_heap %d\n", (int) words);
+//	printf("\nThis is the number of words of sz 8 passed into extend_heap %d\n", (int) words);
 
 	void *bp;
 
@@ -446,7 +446,7 @@ extend_heap(size_t words)
 	PUT(FTRP(bp), PACK(size, 0));         /* Free block footer */
 	PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /* New epilogue header */
 
-    printf("Finished extending heap, going into coalesce now");
+//    printf("Finished extending heap, going into coalesce now");
 	return (coalesce(bp));
 }
 
@@ -486,23 +486,24 @@ place_in_free_list(void* bp) {
 * Effects: Remove recently allocated block in appropriate location in freeList;
 */
 static void 
-remove_from_free_list(void* bp) {
+remove_from_free_list(void *bp) {
 
 //    printf("starting remove from free list\n");
 
-	int block_size = GET_SIZE(HDRP(bp));
-	int index = GET_INDEX(block_size);
-    struct freeBlock *dummy_head = &array_heads[index];
-    struct freeBlock * current = dummy_head->next;
-
-        while(current != dummy_head) {
-            if(current == bp) { //if we find the block to delete
-                current->prev->next = current->next;
-                current->next->prev = current->prev;
-                break;
-            }
-            current = current->next;
-        }
+//	int block_size = GET_SIZE(HDRP(bp));
+//	int index = GET_INDEX(block_size);
+//    struct freeBlock *dummy_head = &array_heads[index];
+//    struct freeBlock * current = dummy_head->next;
+//
+//        while(current != dummy_head) {
+//            if(current == bp) { //if we find the block to delete
+    struct freeBlock *current = bp;
+    current->prev->next = current->next;
+    current->next->prev = current->prev;
+//                break;
+//            }
+//            current = current->next;
+//        }
 //            printf("Finished removing from free list with size: %d\n", (int)block_size);
 }
 
