@@ -76,12 +76,9 @@ static char *heap_listp; /* Pointer to first block */
 struct freeBlock{
 		struct freeBlock *prev;
 		struct freeBlock *next;		
-		//void *current;
-		size_t size;
+		
 };
 
-
-typedef volatile struct freeBlock *freeBlockp;
 
 //static int *free_list[5];
 //static int (*free_lis);
@@ -90,14 +87,11 @@ typedef volatile struct freeBlock *freeBlockp;
 //static int **ptr_list;
 
 //we're going to initialize a struct that contains pointers to the next and prev structs
-struct links {
-    struct links *prev;
-    struct links *next;
-};
+
 
 struct freeBlock *array_heads;
 
-int free_list_size = 100;
+int free_list_size = 50;
 
 
 
@@ -114,7 +108,6 @@ static void checkheap(bool verbose);
 static void printblock(void *bp);
 //static void print_free_list();
 static void remove_from_free_list(void* bp);
-//static void coalesce_all(void);
 
 
 /* 
@@ -223,21 +216,11 @@ mm_malloc(size_t size)
 		return (bp);
 	}
 
-//    coalesce_all();
-//
-//    if ((bp = find_fit(asize)) != NULL) {
-//    		place(bp, asize);
-//    //		printf("finished malloc-ing with a block of adjusted size: %d\n", (int) asize);
-//    //		print_free_list();
-//    //		printf("This is the block returned to be malloc-ed: %p\n", bp);
-//    		return (bp);
-//    	}
-
 	/* No fit found.  Get more memory and place the block. */
 	extendsize = MAX(asize, CHUNKSIZE);
 	if ((bp = extend_heap(extendsize / WSIZE)) == NULL)  
 		return (NULL);
-
+		
 	place(bp, asize);
 //	printf("finished malloc-ing a block of adjusted size: %d\n", (int) asize);
 //	print_free_list();
@@ -266,7 +249,7 @@ mm_free(void *bp)
 	size = GET_SIZE(HDRP(bp));
 	PUT(HDRP(bp), PACK(size, 0));
 	PUT(FTRP(bp), PACK(size, 0));
-	place_in_free_list(bp);
+	//place_in_free_list(bp);
 	coalesce(bp);
 
 }
@@ -381,42 +364,6 @@ coalesce(void *bp)
 }
 
 
-/*
- * Requires:
- *   "bp" is the address of a newly freed block.
- *
- * Effects:
- *   Perform boundary tag coalescing.  Returns the address of the coalesced
- *   block.
- */
-//static void
-//coalesce_all(void)
-//{
-//       printf("\n\nAbout to coalesce all of the free list\n");
-//       void *bp;
-//       bool prev_alloc;
-//       bool next_alloc;
-//       bp = heap_listp;
-//       while (GET_SIZE(HDRP(bp))) {
-//            if(!GET_ALLOC(HDRP(bp))) {
-//            prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
-//            next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
-//            if(!prev_alloc || !next_alloc)
-//                bp = coalesce(bp);
-//            }
-//            bp = NEXT_BLKP(bp);
-//       }
-//
-////       for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
-////            if(!GET_ALLOC(HDRP(bp)))
-////            {
-////                bp = coalesce(bp);
-////            } //only coalesce if block is free
-////       }
-//
-//       printf("\n\nFinished coalescing all of the free list\n");
-//
-// }
 
 
 /* 
@@ -446,7 +393,6 @@ extend_heap(size_t words)
 	PUT(FTRP(bp), PACK(size, 0));         /* Free block footer */
 	PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /* New epilogue header */
 
-//    printf("Finished extending heap, going into coalesce now");
 	return (coalesce(bp));
 }
 
@@ -486,24 +432,28 @@ place_in_free_list(void* bp) {
 * Effects: Remove recently allocated block in appropriate location in freeList;
 */
 static void 
-remove_from_free_list(void *bp) {
+remove_from_free_list(void* bp) {
 
 //    printf("starting remove from free list\n");
 
-//	int block_size = GET_SIZE(HDRP(bp));
-//	int index = GET_INDEX(block_size);
-//    struct freeBlock *dummy_head = &array_heads[index];
-//    struct freeBlock * current = dummy_head->next;
-//
-//        while(current != dummy_head) {
-//            if(current == bp) { //if we find the block to delete
-    struct freeBlock *current = bp;
-    current->prev->next = current->next;
-    current->next->prev = current->prev;
-//                break;
-//            }
-//            current = current->next;
-//        }
+	struct freeBlock *current = bp;
+	current->prev->next = current->next;
+    current->next->prev = current->prev;	
+
+
+	/*int block_size = GET_SIZE(HDRP(bp));
+	int index = GET_INDEX(block_size);
+    struct freeBlock *dummy_head = &array_heads[index];
+    struct freeBlock * current = dummy_head->next;
+
+        while(current != dummy_head) {
+            if(current == bp) { //if we find the block to delete
+                current->prev->next = current->next;
+                current->next->prev = current->prev;
+                break;
+            }
+            current = current->next;
+        }*/
 //            printf("Finished removing from free list with size: %d\n", (int)block_size);
 }
 
@@ -522,7 +472,7 @@ find_fit(size_t asize)
 
 	struct freeBlock *current;
 	int first_index = GET_INDEX(asize);
-	printf("The index we are starting at is: %d\n", first_index);
+	//printf("The index we are starting at is: %d\n", first_index);
 	struct freeBlock *dummy_head;
 //	void *new_mem_location;
 
@@ -534,7 +484,7 @@ find_fit(size_t asize)
 		while(current != dummy_head) {
 		    //WANTED TO TRY GET_SIZE(HDRP(current)), but that didn't work
 			if (GET_SIZE(HDRP(current)) >= asize){
-			    //printf("found fit! of size: %d\n", (int) GET_SIZE(HDRP(current)));
+//			    printf("found fit! of size: %d\n", (int) GET_SIZE(HDRP(current)));
 				return current;
 			}
 			current = current->next;
@@ -542,7 +492,7 @@ find_fit(size_t asize)
 
 	}
 
-	//printf("could not find fit, need to extend heap\n");
+//	printf("could not find fit, need to extend heap\n");
 
 	return NULL;
 
