@@ -477,7 +477,7 @@ find_fit(size_t asize)
 //	void *new_mem_location;
 
 	/* find appropriate size range beginning at smallest possible fit, repopulate size range if neccesary*/
-	for (int index = first_index + 1 ; index < free_list_size; index++) {
+	for (int index = first_index ; index < free_list_size; index++) {
         dummy_head = &array_heads[index];
         current = dummy_head->next;
 		/* if memory is available in size range iterate to find block large enough*/
