@@ -270,7 +270,6 @@ mm_free(void *bp)
 void *
 mm_realloc(void *ptr, size_t size)
 {
-
 //    printf("Realloc happening\n");
 	size_t oldsize;
 	void *newptr;
@@ -285,34 +284,56 @@ mm_realloc(void *ptr, size_t size)
 	if (ptr == NULL)
 		return (mm_malloc(size));
 
-	newptr = mm_malloc(size);
-
-	/* If realloc() fails the original block is left untouched  */
-	if (newptr == NULL)
-		return (NULL);
+//	newptr = mm_malloc(size);
+//
+//	/* If realloc() fails the original block is left untouched  */
+//	if (newptr == NULL)
+//		return (NULL);
 
 	/* Copy the old data. */
 	oldsize = GET_SIZE(HDRP(ptr));
 	if (size < oldsize) {
-		//oldsize = size;
 		return ptr;
 	}
+	
+
+//	memcpy(newptr, ptr, oldsize);
+	//memmove(newptr, ptr, oldsize);
 		
 		//oldsize = size;
 	//check whether free block to the left is large enough
-	if ((!GET_ALLOC(FTRP(PREV_BLKP(ptr)))) && (GET_SIZE(HDRP(PREV_BLKP(ptr))) > size)) {
+	if ((!GET_ALLOC(FTRP(PREV_BLKP(ptr)))) && ((GET_SIZE(HDRP(PREV_BLKP(ptr))) + oldsize) > size)) {
+	    remove_from_free_list(PREV_BLKP(ptr));
+    	PUT(FTRP(ptr), PACK(size, 0));
+    	PUT(HDRP(PREV_BLKP(ptr)), PACK(size, 0));
+    	place(PREV_BLKP(ptr), size);
 		return PREV_BLKP(ptr);
 	}
 	//check whether free block to the right is large enough
-	if ((!GET_ALLOC(FTRP(NEXT_BLKP(ptr)))) && (GET_SIZE(HDRP(NEXT_BLKP(ptr))) > size)) {
+	if ((!GET_ALLOC(FTRP(NEXT_BLKP(ptr)))) && ((GET_SIZE(HDRP(NEXT_BLKP(ptr))) + oldsize) > size)) {
+		remove_from_free_list(NEXT_BLKP(ptr));
+    	PUT(HDRP(ptr), PACK(size, 0));
+    	PUT(FTRP(NEXT_BLKP(ptr)), PACK(size, 0));
+    	place(NEXT_BLKP(ptr), size);
 		return NEXT_BLKP(ptr);
 	}
-	oldsize = size;
+	if ((!GET_ALLOC(FTRP(NEXT_BLKP(ptr)))) &&
+	(!GET_ALLOC(HDRP(PREV_BLKP(ptr)))) &&
+	((GET_SIZE(HDRP(NEXT_BLKP(ptr))) + (GET_SIZE(HDRP(PREV_BLKP(ptr))) + oldsize) > size))) {
+			remove_from_free_list(NEXT_BLKP(ptr));
+    		remove_from_free_list(PREV_BLKP(ptr));
+    		PUT(HDRP(PREV_BLKP(ptr)), PACK(size, 0));
+    		PUT(FTRP(NEXT_BLKP(ptr)), PACK(size, 0));
+    		place(PREV_BLKP(ptr), size);
+    		return PREV_BLKP(ptr);
+	}
+
+	newptr = mm_malloc(size);
 	memcpy(newptr, ptr, oldsize);
-	//memmove(newptr, ptr, oldsize);
+
 
 	/* Free the old block. */
-	mm_free(ptr);
+//	mm_free(ptr);
 
 //	printf("finished realloc");
 
@@ -350,7 +371,7 @@ coalesce(void *bp)
 		//should we leave this as it was here or keep the change to move it down??
 		//place_in_free_list(bp);
 		PUT(HDRP(bp), PACK(size, 0));
-		PUT(FTRP(bp), PACK(size, 0));
+		PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
 //		printf("\n2: This is the new size of pointer in coalesce %d\n", (int) GET_SIZE(HDRP(bp)));
 		place_in_free_list((bp));
 	
