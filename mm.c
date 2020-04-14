@@ -183,7 +183,7 @@ mm_init(void)
 void *
 mm_malloc(size_t size) 
 {
-    printf("Starting to malloc a block of size: %d\n", (int) size);
+//    printf("Starting to malloc a block of size: %d\n", (int) size);
 	size_t asize;      /* Adjusted block size */
 	size_t extendsize; /* Amount to extend heap if no fit */
 	void *bp;
@@ -304,55 +304,60 @@ mm_realloc(void *ptr, size_t size)
 		//oldsize = size;
 	//check whether free block to the left is large enough
 	printf("This is inside the realloc function \n");
-	if ((!GET_ALLOC(FTRP(PREV_BLKP(ptr)))) && ((GET_SIZE(HDRP(PREV_BLKP(ptr))) + oldsize) > size)) {
+	void *prev = PREV_BLKP(ptr);
+	void *next = NEXT_BLKP(ptr);
+	if ((!GET_ALLOC(FTRP(prev))) && ((GET_SIZE(HDRP(prev)) + oldsize) > size)) {
 		printf("case 1 realloc\n");
-		printf("The size of free prev and allocated current blocks together is %d\n", (int) (GET_SIZE(HDRP(PREV_BLKP(ptr))) + oldsize));
-	    	    remove_from_free_list(PREV_BLKP(ptr));
+//		printf("The size of free prev and allocated current blocks together is %d\n", (int) (GET_SIZE(HDRP(PREV_BLKP(ptr))) + oldsize));
+	    remove_from_free_list(prev);
 	    //PUT(HDRP(ptr), PACK(oldsize, 0));
-    	PUT(FTRP(ptr), PACK((GET_SIZE(HDRP(PREV_BLKP(ptr))) + oldsize), 1));
-    	PUT(HDRP(PREV_BLKP(ptr)), PACK((GET_SIZE(HDRP(PREV_BLKP(ptr))) + oldsize), 1));
+    	PUT(FTRP(ptr), PACK((GET_SIZE(HDRP(prev)) + oldsize), 1));
+    	PUT(HDRP(prev), PACK((GET_SIZE(HDRP(prev)) + oldsize), 1));
     	//place(PREV_BLKP(ptr), size);
-    	printf("The location of the next block in heap is %p\n", NEXT_BLKP(PREV_BLKP(ptr)));
-    	printf("This is the prev pointer %p and the current pointer %p\n", PREV_BLKP(ptr), ptr );
-    	void *prev = PREV_BLKP(ptr);	
-    	memmove(PREV_BLKP(ptr), ptr, oldsize);
+//    	printf("The location of the next block in heap is %p\n", NEXT_BLKP(PREV_BLKP(ptr)));
+//    	printf("This is the prev pointer %p and the current pointer %p\n", PREV_BLKP(ptr), ptr );
+    	memmove(prev, ptr, oldsize);
     	printf("after memmove: This is the prev pointer %p and the current pointer %p\n", prev, ptr );
     	printf("successful realloc completed\n");
     	//ptr = PREV_BLKP(ptr);
-
 		return prev;
 		//return ptr;
 	}
 	//check whether free block to the right is large enough
-	if ((!GET_ALLOC(FTRP(NEXT_BLKP(ptr)))) && ((GET_SIZE(HDRP(NEXT_BLKP(ptr))) + oldsize) > size)) {
+	if ((!GET_ALLOC(HDRP(next))) && ((GET_SIZE(HDRP(next)) + oldsize) > size)) {
 		printf("case 2 realloc\n");
-		remove_from_free_list(NEXT_BLKP(ptr));
-    	PUT(HDRP(ptr), PACK((GET_SIZE(HDRP(NEXT_BLKP(ptr))) + oldsize), 1));
-    	PUT(FTRP(NEXT_BLKP(ptr)), PACK((GET_SIZE(HDRP(NEXT_BLKP(ptr))) + oldsize), 1));
-    	void *next = NEXT_BLKP(ptr);
-    	memmove(NEXT_BLKP(ptr), ptr, oldsize);
+		remove_from_free_list(next);
+    	PUT(HDRP(ptr), PACK((GET_SIZE(HDRP(next)) + oldsize), 1));
+    	PUT(FTRP(next), PACK((GET_SIZE(HDRP(next)) + oldsize), 1));
+//    	void *next = NEXT_BLKP(ptr);
+    	memmove(next, ptr, oldsize);
+    	    	printf("after memmove: This is the prev pointer %p and the current pointer %p\n", prev, ptr );
+            	printf("successful realloc completed\n");
 
     	//place(NEXT_BLKP(ptr), size);
 		//return NEXT_BLKP(ptr);
 		return next;
 	}
-	if ((!GET_ALLOC(FTRP(NEXT_BLKP(ptr)))) &&
-	(!GET_ALLOC(HDRP(PREV_BLKP(ptr)))) &&
-	((GET_SIZE(HDRP(NEXT_BLKP(ptr))) + (GET_SIZE(HDRP(PREV_BLKP(ptr))) + oldsize) > size))) {
+	if ((!GET_ALLOC(FTRP(next))) &&
+	(!GET_ALLOC(HDRP(prev))) &&
+	((GET_SIZE(HDRP(next)) + GET_SIZE(HDRP(prev)) + oldsize) > size)) {
 			printf("case 3 realloc\n");
-			remove_from_free_list(NEXT_BLKP(ptr));
-    		remove_from_free_list(PREV_BLKP(ptr));
-    		PUT(HDRP(PREV_BLKP(ptr)), PACK(GET_SIZE(HDRP(NEXT_BLKP(ptr))) + (GET_SIZE(HDRP(PREV_BLKP(ptr))) + oldsize), 1));
-    		PUT(FTRP(NEXT_BLKP(ptr)), PACK(GET_SIZE(HDRP(NEXT_BLKP(ptr))) + (GET_SIZE(HDRP(PREV_BLKP(ptr))) + oldsize), 1));
-    		void *prev = PREV_BLKP(ptr);
-    		memmove(PREV_BLKP(ptr), ptr, oldsize);
+			remove_from_free_list(next);
+    		remove_from_free_list(prev);
+    		PUT(HDRP(prev), PACK(GET_SIZE(HDRP(next)) + (GET_SIZE(HDRP(prev)) + oldsize), 1));
+    		PUT(FTRP(next), PACK(GET_SIZE(HDRP(next)) + (GET_SIZE(HDRP(prev)) + oldsize), 1));
+//    		void *prev = PREV_BLKP(ptr);
+    		memmove(prev, ptr, oldsize);
     		//place(PREV_BLKP(ptr), size);
+    		    	printf("after memmove: This is the prev pointer %p and the current pointer %p\n", prev, ptr );
+                	printf("successful realloc completed\n");
     		return prev;
     		//return PREV_BLKP(ptr);
 	}
 
 	newptr = mm_malloc(size);
 	memcpy(newptr, ptr, oldsize);
+	mm_free(ptr);
 
 
 	/* Free the old block. */
