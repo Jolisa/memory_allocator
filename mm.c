@@ -67,7 +67,7 @@ team_t team = {
 #define PREV_BLKP(bp)  ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
 /*Given a size, return pointer to index for given size range in freeList */
-#define GET_INDEX(size) ((size) == (0) ? (-1) : (size) < (3) ? (0) : (size) < (5) ? (1) : (size) < (9) ? (2) : (size) < (17) ? (3) : (size) < (33) ? (4) : (size) < (65) ? (5) : (size) < (129) ? (6) : (size) < (257) ? (7) : (size) < (513) ? (8) : (9))
+#define GET_INDEX(size) ((size) == (0) ? (-1) : (size) < (3) ? (0) : (size) < (5) ? (1) : (size) < (9) ? (2) : (size) < (17) ? (3) : (size) < (33) ? (4) : (size) < (65) ? (5) : (size) < (129) ? (6) : (size) < (257) ? (7) : (size) < (513) ? (8) : (size) < (1025) ? (9) : (size) < (2049) ? (10) : (size) < (4096) ? (11) : (size) < (8192) ? (12) : (size) < (16385) ? (13) : (size) < (32768) ? (14) : (size) < (65536) ? (15) : (size) < (131073) ? (16) : (size) < (262145) ? (17) : (size) < (524289) ? (18) : (size) < (1048577) ? (19) : (size) < (2097153) ? (20) : (size) < (4194305) ? (21) : (size) < (8388609) ? (22) : (size) < (16777217) ? (23) : (size) < (33554433) ? (24) : (size) < (67108865) ? (25) : (26))
 //#define GET_INDEX(size) ceil(log(size)/log(2));
 //#define GET_INDEX(size) ceil((float)size/100.0);
 /* Global variables: */
@@ -293,8 +293,21 @@ mm_realloc(void *ptr, size_t size)
 
 	/* Copy the old data. */
 	oldsize = GET_SIZE(HDRP(ptr));
-	if (size < oldsize)
-		oldsize = size;
+	if (size < oldsize) {
+		//oldsize = size;
+		return ptr;
+	}
+		
+		//oldsize = size;
+	//check whether free block to the left is large enough
+	if ((!GET_ALLOC(FTRP(PREV_BLKP(ptr)))) && (GET_SIZE(HDRP(PREV_BLKP(ptr))) > size)) {
+		return PREV_BLKP(ptr);
+	}
+	//check whether free block to the right is large enough
+	if ((!GET_ALLOC(FTRP(NEXT_BLKP(ptr)))) && (GET_SIZE(HDRP(NEXT_BLKP(ptr))) > size)) {
+		return NEXT_BLKP(ptr);
+	}
+	oldsize = size;
 	memcpy(newptr, ptr, oldsize);
 	//memmove(newptr, ptr, oldsize);
 
