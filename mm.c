@@ -67,8 +67,8 @@ team_t team = {
 #define PREV_BLKP(bp)  ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
 /*Given a size, return pointer to index for given size range in freeList */
-//#define GET_INDEX(size) ((size) == (0) ? (-1) : (size) < (3) ? (0) : (size) < (5) ? (1) : (size) < (9) ? (2) : (size) < (17) ? (3) : (size) < (33) ? (4) : (size) < (65) ? (5) : (size) < (129) ? (6) : (size) < (257) ? (7) : (size) < (513) ? (8) : (9))
-#define GET_INDEX(size) ceil(log(size)/log(2));
+#define GET_INDEX(size) ((size) == (0) ? (-1) : (size) < (3) ? (0) : (size) < (5) ? (1) : (size) < (9) ? (2) : (size) < (17) ? (3) : (size) < (33) ? (4) : (size) < (65) ? (5) : (size) < (129) ? (6) : (size) < (257) ? (7) : (size) < (513) ? (8) : (9))
+//#define GET_INDEX(size) ceil(log(size)/log(2));
 //#define GET_INDEX(size) ceil((float)size/100.0);
 /* Global variables: */
 static char *heap_listp; /* Pointer to first block */  
@@ -91,7 +91,7 @@ struct freeBlock{
 
 struct freeBlock *array_heads;
 
-int free_list_size = 50;
+int free_list_size = 26;
 
 
 
@@ -296,6 +296,7 @@ mm_realloc(void *ptr, size_t size)
 	if (size < oldsize)
 		oldsize = size;
 	memcpy(newptr, ptr, oldsize);
+	//memmove(newptr, ptr, oldsize);
 
 	/* Free the old block. */
 	mm_free(ptr);
