@@ -183,7 +183,7 @@ mm_init(void)
 void *
 mm_malloc(size_t size) 
 {
-//    printf("Starting to malloc a block of size: %d\n", (int) size);
+    //printf("Starting to malloc a block of size: %d\n", (int) size);
 	size_t asize;      /* Adjusted block size */
 	size_t extendsize; /* Amount to extend heap if no fit */
 	void *bp;
@@ -292,7 +292,7 @@ mm_realloc(void *ptr, size_t size)
 
 	/* Copy the old data. */
 	oldsize = GET_SIZE(HDRP(ptr));
-	if (size < oldsize) {
+	if (size <= oldsize) {
 		return ptr;
 	}
 	printf("Realloc happening with size %d and oldsize %d \n", (int) size, (int) oldsize);
@@ -313,9 +313,6 @@ mm_realloc(void *ptr, size_t size)
 	    //PUT(HDRP(ptr), PACK(oldsize, 0));
     	PUT(FTRP(ptr), PACK((GET_SIZE(HDRP(prev)) + oldsize), 1));
     	PUT(HDRP(prev), PACK((GET_SIZE(HDRP(prev)) + oldsize), 1));
-    	//place(PREV_BLKP(ptr), size);
-//    	printf("The location of the next block in heap is %p\n", NEXT_BLKP(PREV_BLKP(ptr)));
-//    	printf("This is the prev pointer %p and the current pointer %p\n", PREV_BLKP(ptr), ptr );
     	memmove(prev, ptr, oldsize);
     	printf("after memmove: This is the prev pointer %p and the current pointer %p\n", prev, ptr );
     	printf("successful realloc completed\n");
@@ -330,13 +327,14 @@ mm_realloc(void *ptr, size_t size)
     	PUT(HDRP(ptr), PACK((GET_SIZE(HDRP(next)) + oldsize), 1));
     	PUT(FTRP(next), PACK((GET_SIZE(HDRP(next)) + oldsize), 1));
 //    	void *next = NEXT_BLKP(ptr);
-    	memmove(next, ptr, oldsize);
-    	    	printf("after memmove: This is the prev pointer %p and the current pointer %p\n", prev, ptr );
-            	printf("successful realloc completed\n");
+    	printf("before memmove: This is the next pointer %p and the current pointer %p\n", next, ptr );
+    	//memmove(next, ptr, oldsize);
+    	printf("after memmove: This is the next pointer %p and the current pointer %p\n", next, ptr );
+    	printf("successful realloc completed\n");
 
     	//place(NEXT_BLKP(ptr), size);
 		//return NEXT_BLKP(ptr);
-		return next;
+		return ptr;
 	}
 	if ((!GET_ALLOC(FTRP(next))) &&
 	(!GET_ALLOC(HDRP(prev))) &&
@@ -349,12 +347,12 @@ mm_realloc(void *ptr, size_t size)
 //    		void *prev = PREV_BLKP(ptr);
     		memmove(prev, ptr, oldsize);
     		//place(PREV_BLKP(ptr), size);
-    		    	printf("after memmove: This is the prev pointer %p and the current pointer %p\n", prev, ptr );
-                	printf("successful realloc completed\n");
+	    	printf("after memmove: This is the prev pointer %p and the current pointer %p\n", prev, ptr );
+        	printf("successful realloc completed\n");
     		return prev;
     		//return PREV_BLKP(ptr);
 	}
-
+	printf("realloc failed, going on to malloc");
 	newptr = mm_malloc(size);
 	memcpy(newptr, ptr, oldsize);
 	mm_free(ptr);
@@ -383,6 +381,7 @@ mm_realloc(void *ptr, size_t size)
 static void *
 coalesce(void *bp) 
 {
+	printf("in coalesce\n");
 	size_t size = GET_SIZE(HDRP(bp));
 	bool prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
 	bool next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
